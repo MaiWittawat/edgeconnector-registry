@@ -1,0 +1,12 @@
+{
+  "name": "t-hang",
+  "version": "1.0.0",
+  "os": "linux",
+  "arch": "arm64",
+  "artifact": {
+    "sha256": "15117c51fcc919a6bfff703db60978b9df05bd89a39cbc022099f2c8cd09e5dd",
+    "signature": "sVR3dHj3E+69O2gFws3XbplRFnynDkXCXAFZvMqxSfC8Wb230b9OlnzHc3y6dvH7bCzrwN8WlyfkuKiZ0v+yAw==",
+    "keyId": "lab-2026",
+    "size": "138"
+  }
+}
