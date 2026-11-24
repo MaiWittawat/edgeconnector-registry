@@ -1,5 +1,12 @@
 {
   "plugins": {
+    "a": {
+      "versions": {
+        "1.0.0": [
+          "linux_amd64"
+        ]
+      }
+    },
     "hello": {
       "versions": {
         "1.0.0": [
