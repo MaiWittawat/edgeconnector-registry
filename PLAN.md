@@ -1,0 +1,234 @@
+# PLAN: release สำหรับทดสอบ registry
+
+เป้าหมาย: เลือกว่า "ควรปล่อย release อะไรลง registry นี้" เพื่อทดสอบทุกกรณีของ manager / UI / `cc-release` กับ registry จริง (GitHub raw)
+เขียนจากการอ่านโค้ดใน repo edgeconnector: `release/`, `cmd/cc-release`, `connectormanager/plugins.go`, `connectormanager/selfupdate.go`, `internal/supervisor`, `worker`, `examples/hello-plugin`, `connectorserver/ui/pages.go`
+
+> สถานะ: **แผนเท่านั้น ยังไม่ได้ build หรือ push อะไร** · registry ตอนนี้ว่าง (มีแค่ README.md)
+>
+> **ตัดสินใจแล้ว (2026-11-24):** ทดสอบบน Linux อย่างเดียว (ไม่ทำ darwin) · มี branch `negative` · ทำกรณี version (`t-ver`) ·
+> ไม่มี CRM จริง ใช้ `examples/center` (CRM จำลอง) วางบน Ubuntu VPS เครื่องเดียวกับ manager (ข้อ 4.1)
+> **VPS:** `x86_64` → `linux_amd64` (ไม่ต้องทำ arm64 ยกเว้น `t-otherarch` กับ manager ที่ `manager-release` สร้างทั้งสอง arch ให้เอง)
+> **โค้ดที่ต้อง merge ก่อน build release** (build จาก commit ที่สะอาดบน main เท่านั้น):
+> PR #10 `feat(ui)` เรียง version แบบ semver · PR #11 `feat(hello-plugin)` เพิ่ม `startDelay` / `crashAfter` (ทำให้ `t-slow` / `t-crash` ทำได้)
+
+---
+
+## 0. ข้อจำกัดที่ต้องรู้ก่อนวางแผน
+
+| ข้อจำกัด | ผลต่อแผน |
+|---|---|
+| release แก้ทับไม่ได้ (`Publish` ปฏิเสธถ้ามีโฟลเดอร์อยู่แล้ว) และ repo เป็น git | version ที่ push แล้วถือว่า "ใช้ไปแล้ว" · ลบจาก git history ได้ยาก → **ลองใน registry ในเครื่องก่อน push เฉพาะตัวที่ผ่านแล้ว** |
+| archive ของ hello-plugin ~5 MB ต่อ platform (manager ~5 MB) | 2 platform (linux amd64 + arm64) ≈ 10 MB ต่อ 1 version · ปล่อย 10 version = 100 MB ใน git ถาวร → hello 1.0.0 ปล่อย linux ทั้งสอง arch ส่วน version อื่นของ hello ปล่อยเฉพาะ arch ของ VPS · fixture ที่เป็น shell script ไม่กี่ byte จึงปล่อยทั้งสอง arch ได้ · build ด้วย `make … PLATFORMS="linux/amd64 linux/arm64"` (ค่าจาก command line ทับ `PLATFORMS` ใน Makefile ได้) |
+| `cc-release verify` ล้มถ้ามี release ที่ลายเซ็น/sha ผิด | release ที่ตั้งใจให้เสีย **ห้ามอยู่ใน branch `main`** (ไม่งั้น verify ก่อน push ไม่ผ่านตลอดไป) → ใช้ branch แยก (ข้อ 3) |
+| cache ของ raw.githubusercontent ~5 นาที (index.json, channels/*.json) | หลัง push รอก่อนทดสอบ หรือทดสอบใน registry ในเครื่องที่ไม่มี cache |
+| `CC_RELEASE_URL` ใส่ branch ใน path (`.../edgeconnector-registry/<branch>`) | เปลี่ยน branch = เปลี่ยน registry โดยไม่ต้องแก้โค้ด · ใช้ได้กับ branch ทดสอบ |
+| `cc-release package` สร้าง tar เองเสมอ (ปลอดภัยเสมอ) | archive อันตราย (symlink, `../`) ต้องสร้างด้วย Go โปรแกรมทิ้ง ไม่ใช่ `cc-release` |
+| unit test ฝั่ง release/manager ครอบคลุมกรณีเสียเกือบหมดแล้ว (`fetch_test.go`, `publish_test.go`, `selfupdate_test.go`, `manager_test.go`) | registry จริงใช้พิสูจน์ **ทางจริงที่ unit test จำลองไม่ได้**: HTTPS, GitHub raw, URL ที่มี `+`, cache, systemd + manager-guard, ข้าม platform จริง |
+
+---
+
+## 1. Key ที่ต้องมี
+
+| key | ใช้ทำอะไร | เก็บ |
+|---|---|---|
+| `lab-2026` | key หลัก เซ็นทุกอย่างที่ควรติดตั้งได้ | `~/cc-keys/lab-2026.key` (ยังไม่ได้สร้าง) |
+| `lab-2027` | key ที่สอง ทดสอบการหมุน key (ข้อ T-KEY) · manager ที่เชื่อแค่ `lab-2026` ต้องปฏิเสธของที่เซ็นด้วยตัวนี้ | `~/cc-keys/lab-2027.key` |
+
+สร้าง (รันจากรากโปรเจกต์ edgeconnector · ไม่ทับไฟล์ที่มีอยู่ · `.key` เป็นความลับ ห้ามอยู่ใน repo ใด ๆ):
+
+```bash
+go run ./cmd/cc-release keygen -dir ~/cc-keys -id lab-2026
+go run ./cmd/cc-release keygen -dir ~/cc-keys -id lab-2027
+```
+
+แต่ละคำสั่งพิมพ์บรรทัด `lab-2026=<base64>` (ค่า public ที่ใช้เป็น `CC_TRUSTED_KEYS` และ `verify -pubkey` เปิดเผยได้)
+
+`verify` ต้องใส่ทั้งสอง: `-pubkey lab-2026=<b64>,lab-2027=<b64>` ไม่งั้นตัวที่เซ็นด้วย lab-2027 จะถูกรายงานว่าเสีย
+ไม่ใช้ `release-2026` (เป็น key ของ ORIG ที่จะเลิกใช้)
+
+---
+
+## 2. รายการ release ที่ควรทำ (branch `main` · ทุกตัว verify ผ่าน)
+
+ชื่อ plugin ที่เป็น fixture ใช้ขึ้นต้น `t-` เพื่อแยกจาก `hello` ที่เป็นตัวอย่างจริงในหน้า UI
+
+### 2.1 `hello` — ตัวอย่างจริง (build ด้วย `make plugin-release PLATFORMS="linux/amd64 linux/arm64"` สำหรับ 1.0.0 · ตัวอื่นเฉพาะ arch ของ VPS)
+
+| version | เนื้อหา | channel | กรณีที่ทดสอบ |
+|---|---|---|---|
+| `1.0.0` | hello-plugin ปกติ (`-X main.version=1.0.0`) · **linux amd64 + arm64** | `stable` | ติดตั้งครั้งแรก healthy · Request `version`/`config` · identity ถูกสร้าง (`plg_<hash>`, scopes ⊆ manager) |
+| `1.1.0` | ปกติ อีก version | `beta` | อัปเกรด 1.0.0 → 1.1.0: `Previous=1.0.0` · identity เดิมถูกใช้ต่อ (ไม่ register ซ้ำ) · `plugin.rollback` กลับ 1.0.0 โดยไม่แตะ registry · ติดตั้ง version เดิมซ้ำตอน running = `Already` |
+| `1.2.0` | **พัง**: build ด้วย `-X main.broken=true` (มีในโค้ดอยู่แล้ว) | – | อัปเกรดจาก 1.1.0 → ไม่ healthy → manager ถอยกลับ 1.1.0 เอง · error บอกว่า "rolled back to 1.1.0" · `Current` ยัง 1.1.0 |
+| `1.3.0` | ปกติ แต่ **เซ็นด้วย `lab-2027`** | – | T-KEY: manager เชื่อ lab-2026 อย่างเดียว = ปฏิเสธ (`ErrUnknownKey`) · เชื่อทั้งสอง = ติดตั้งได้ (หมุน key) |
+
+ข้อสังเกต: 1.2.0 ต้องลองสองแบบ คือ (ก) ติดตั้งทับ 1.1.0 → ถอยกลับ, (ข) ติดตั้งบนเครื่องที่ **ยังไม่เคยมี hello** → error และไม่ทิ้งโฟลเดอร์ `plugins/hello` ว่างค้าง (โค้ดมีลบให้ ควรเห็นกับตาจริง)
+
+### 2.2 fixture แบบ shell script (ไม่ต้อง build Go · ไฟล์เล็กมาก · **ไม่ต้องแก้โค้ดใดเลย**)
+
+`cc-release package -binary` รับไฟล์ regular อะไรก็ได้ จึงใส่ shell script เป็น "plugin" ได้ · ปล่อยทั้ง linux_amd64 และ linux_arm64 ได้เพราะไฟล์เล็ก
+
+| ชื่อ | script | กรณีที่ทดสอบ |
+|---|---|---|
+| `t-hang` | `#!/bin/sh` → `sleep 3600` (ไม่เปิด health socket) | ติดตั้งแล้วไม่ healthy ภายใน `start_timeout_sec` → ล้ม + หยุด process · ใส่ `start_timeout_sec: 3` เพื่อไม่ต้องรอ 30 วิ · ดู log ใน `plugin.logs` |
+| `t-exit` | `#!/bin/sh` → `echo boom >&2; exit 1` | ตายทันที · supervisor เปิดใหม่ซ้ำ (RestartDelay 1 วิ) · ติดตั้งต้องล้ม (ยังไม่ได้ยืนยันว่า `WaitHealthy` คืน error เร็วตอน process ตาย หรือรอจนหมด `start_timeout_sec` → จดผลจริงในข้อ 7) · `Restarts` เพิ่ม |
+| `t-noterm` | `#!/bin/sh` → `trap '' TERM; while :; do sleep 1; done` | **ไม่ยอมตาย** ตอน SIGTERM → `Stop(10s)` ต้อง SIGKILL หลังครบเวลา · ใช้ลอง `plugin.remove` / stop ว่าไม่ค้าง (ตัวนี้ไม่ healthy จึงต้องมองจากฝั่ง remove/stop) |
+
+หมายเหตุ: เป็น shell script จึงรันได้แค่ unix · ไม่เป็นปัญหาเพราะทดสอบบน Linux
+
+### 2.3 hello-plugin ที่พังแบบมี health (เพิ่ม flag แล้วใน PR #11 · รอ merge)
+
+shell script ทำ "healthy แล้วค่อยพังทีหลัง" ไม่ได้ (ต้องเปิด unix socket ตอบ `/health`) จึงเพิ่ม ldflags ใน `examples/hello-plugin/main.go` แบบเดียวกับ `broken` (ค่าเวลาเป็นรูปแบบ `time.ParseDuration`):
+
+| ldflag | พฤติกรรม | ใช้ทำ fixture |
+|---|---|---|
+| `-X main.startDelay=8s` | `time.Sleep` ใน setup ก่อน connect → healthy ช้า | `t-slow`: ใส่ `start_timeout_sec: 3` = ล้ม + ถอยกลับ · ใส่ 20 = ผ่าน (พิสูจน์ว่า timeout ต่อ plugin ทำงานจริง ไม่ใช่ค่า default 30 วิ) |
+| `-X main.crashAfter=5s` | healthy แล้ว `os.Exit(1)` หลัง 5 วิ | `t-crash`: ติดตั้งผ่าน แล้ว supervisor เปิดใหม่เป็นระยะ · `host.status` เห็น `Restarts` เพิ่ม · plugin ไม่ถูกถอยกลับ (ถอยกลับเฉพาะตอนติดตั้ง) |
+
+build เป็น plugin ชื่อ `t-slow` / `t-crash` ด้วย `make plugin-release NAME=t-slow PLUGIN_PKG=./examples/hello-plugin …` (ชื่อ plugin ไม่ต้องตรงกับชื่อโฟลเดอร์ใน `examples/`) · `crashAfter` ต้องนานกว่าเวลาเริ่มจริง (แนะนำ 5s ขึ้นไป) ไม่งั้นตายก่อน healthy เหมือน `broken`
+
+### 2.4 ชื่อและ version ที่เป็นกรณีขอบ
+
+| ปล่อยอะไร | กรณีที่ทดสอบ |
+|---|---|
+| `t-ver` เวอร์ชัน `2.0.0-rc.1+build.5` | `+` ใน URL path ผ่าน GitHub raw ได้จริงไหม · `ValidVersion` ยอม `+`, `.`, `-` · UI แสดงถูก · ติดตั้งผ่าน manager ได้ |
+| `t-ver` เวอร์ชัน `1.9.0`, `1.10.0`, `1.10.0-rc.1` | UI เรียงแบบ semver (PR #10): `1.9.0` → `1.10.0-rc.1` → `1.10.0` · เปิดหน้า manager ใน UI เทียบกับลำดับนี้ |
+| `t-ver` เวอร์ชัน `v1` | version ที่ไม่ใช่ semver ใช้ได้ (ตามที่ regex ยอม) |
+| `a` (ชื่อ 1 ตัวอักษร) และชื่อยาว 63 ตัว (`t-` + `x` ให้ครบ 63) | ขอบของ `nameRe` (`{0,62}`) · ต่อ URL/สร้างโฟลเดอร์/socket path ได้ · **ระวัง**: socket `<run>/<name>.sock` ยาวเกิน ~104 ตัวบน macOS ได้ ถ้า `-run-dir` ยาว → ใช้ shell script ไฟล์เล็ก |
+
+### 2.5 ครอบคลุม platform (Linux อย่างเดียว)
+
+| ปล่อยอะไร | กรณีที่ทดสอบ |
+|---|---|
+| `t-otherarch` 1.0.0 (shell script) เฉพาะ arch ที่ **ไม่ใช่** ของ VPS (VPS amd64 → ปล่อย `linux_arm64`) | ติดตั้งบน VPS = `ErrNotPublished` ("not published: … for linux/amd64") ไม่ใช่ error แปลก ๆ · UI: `ForHost=false` แสดงต่างจาก release ที่ลงได้ |
+| `hello` 1.0.0 linux amd64 + arm64 | ตรงข้าม: ลงได้ทั้งสอง arch |
+| (ไม่ปล่อย) `t-nonexistent` | ติดตั้งชื่อ/version ที่ไม่มีเลย = 404 → `ErrNotPublished` · ไม่ต้องมีไฟล์ใน registry |
+
+### 2.6 channel
+
+| channel | ชี้ไป | ทดสอบ |
+|---|---|---|
+| `hello/channels/stable.json` | 1.0.0 | UI แสดงป้าย stable ที่ version นั้น |
+| `hello/channels/beta.json` | 1.1.0 | หลาย channel คนละ version · `promote` ใหม่ = ย้ายป้ายได้ (channel เป็นของที่แก้ได้ ต่างจาก release) |
+| – | – | สั่งติดตั้ง version ชื่อ `stable` ผ่าน CRM = ต้องล้ม "not published" (manager/CRM **ไม่แปลง channel เป็น version** · `install-manager.sh` เท่านั้นที่อ่าน channel) |
+
+### 2.7 `manager` — ตัวจริงของ manager (ต้อง Linux + systemd ถึงจะลองครบ)
+
+ปล่อยด้วย `make manager-release` (ได้ `install-manager.sh` ที่ราก registry ด้วย) · มีแค่ `linux_amd64` + `linux_arm64` ตามที่ target กำหนด
+
+| version | เนื้อหา | ทดสอบ |
+|---|---|---|
+| `1.0.0` | manager จริง · promote → `stable` | `curl … install-manager.sh \| sh` ติดตั้งครั้งแรกจริง (token, server, base-url) · manager-guard ถูกฝังใน script · systemd รัน `current/bin/manager` |
+| `1.1.0` | manager จริง อีก version | `manager.update` 1.0.0 → 1.1.0: โหลด+ตรวจลายเซ็น → เขียน `update/` → สลับ `current` → ตัวใหม่ต่อ CRM ได้และ ack `host.status` → ลบ `update/` = สำเร็จ · `Already` ถ้าสั่ง version เดียวกันซ้ำ |
+| `1.2.0-bad-exit` | **shell script** `#!/bin/sh` → `exit 1` ใส่เป็น `bin/manager` | ตัวใหม่ crash วน → manager-guard นับ `attempts` แล้วถอยกลับ `previous` · ได้ `update-failed` ใน `host.status` |
+| `1.2.1-bad-hang` | **shell script** `sleep 3600` | ตัวใหม่ค้าง ไม่ต่อ CRM → ไม่ถึง `UpdateDeadline` (2 นาที) ก็ถูก guard/systemd timer ถอยกลับ · ตรวจว่าเครื่องกลับมาออนไลน์เอง |
+
+ข้อควรระวัง: version `1.2.x` ของ manager ที่เป็น script **อย่า promote เป็น `stable`** ไม่งั้นเครื่องที่ติดตั้งใหม่จะได้ตัวพัง · ลอง `--version` เท่านั้น
+manager ที่ build ด้วย `-X main.version=…` ต้องตรงกับ `MANAGER_VERSION` (make ทำให้เอง) ไม่งั้น `Already` ตัดสินผิด
+
+---
+
+## 3. branch `negative` — release ที่ตั้งใจให้เสีย (ไม่ merge เข้า main)
+
+ใช้ `CC_RELEASE_URL=https://raw.githubusercontent.com/MaiWittawat/edgeconnector-registry/negative` · `cc-release verify` บน branch นี้ **ต้องล้ม** (นั่นคือเป้าหมาย)
+ส่วนใหญ่ unit test ครอบคลุมแล้ว ทำที่นี่เพื่อลองผ่าน HTTPS จริงและดูข้อความ error ที่ CRM/UI แสดง · ทำทีหลังสุด
+
+สร้างด้วยโปรแกรม Go ทิ้ง (เก็บไว้ใน scratchpad ไม่ใส่ repo) ที่เรียก `release.Manifest.Sign` + แก้ไฟล์หลังเซ็น · ใช้ shell script เล็ก ๆ เป็น binary เพื่อให้ repo ไม่โต
+
+| plugin / version | ความเสียหาย | manager ต้องตอบ |
+|---|---|---|
+| `t-badsha` 1.0.0 | แก้ byte ใน archive หลังเซ็น | `ErrBadChecksum` · dest ไม่ถูกสร้าง · ไม่มีไฟล์ชั่วคราวค้าง |
+| `t-badsig` 1.0.0 | manifest ลายเซ็นผิด (แก้ `sha256` ใน manifest) | `ErrBadSignature` ก่อนโหลด archive (ดูจาก access log: ไม่มี request ไป archive) |
+| `t-mismatch` 1.0.0 | ใส่ manifest ของ `1.0.1` ไว้ในโฟลเดอร์ `1.0.0` | "manifest is for t-mismatch 1.0.1" |
+| `t-size` 1.0.0 | `size` ใน manifest ไม่ตรงไฟล์จริง | ปฏิเสธ (size mismatch) |
+| `t-nokeyid` 1.0.0 | manifest ไม่มี `keyId`/`sha256` | "manifest is incomplete" |
+| `t-colon` 1.0.0 | `name`/`version` ใน manifest มี `:` | ปฏิเสธ (กันลายเซ็นใช้แทนกันได้) |
+| `t-traversal` 1.0.0 | tar มี entry `../evil` | `Extract` ปฏิเสธ (unsafe path) · ไม่มีไฟล์หลุดออกนอก `versions/` |
+| `t-symlink` 1.0.0 | tar มี symlink | `Extract` ปฏิเสธ (unsupported entry) |
+| `t-nobin` 1.0.0 | tar ปกติ แต่ไม่มี `bin/t-nobin` | ติดตั้งล้มอย่างอ่านรู้เรื่อง ไม่ใช่ panic · (manager: สำหรับ plugin `startProcess` ไม่เจอไฟล์ → ไม่ healthy) |
+| `t-notgz` 1.0.0 | archive ไม่ใช่ gzip (เซ็นถูกต้อง) | `Extract` error · ไม่ทิ้ง `.tmp` |
+| `t-index-huge` | `index.json` ใหญ่ >1 MB | UI: `ReleaseErr` แสดงข้อความ ไม่ล่มทั้งหน้า |
+
+ไม่ปล่อยใน git (ใหญ่เกินไป): archive >200 MB และ manifest >64 KB → ทดสอบกับ `python3 -m http.server`/server ทิ้งในเครื่องแทน (unit test มี `TestGetLimit` และ `TestIndexTooLarge` อยู่แล้ว ข้ามได้)
+
+---
+
+## 4. ขั้นตอนทำงาน (ทำทีละขั้น ขั้นหน้าต้องผ่านก่อน)
+
+1. **keygen**: คำสั่งอยู่ในข้อ 1 · จดบรรทัด `id=<base64>` ทั้งสอง (`.key` เป็นของลับ · `.pub` และ base64 เปิดเผยได้)
+2. **registry ในเครื่อง**: ทำใน `/tmp` ไม่ใช่ repo นี้ (`data/try-registry` ตาม README ของโปรเจกต์) · build + เซ็น fixture ข้อ 2 ทั้งหมด · `cc-release verify` ต้องผ่านทุกตัว · ดูขนาดรวม
+3. **ลองกับ manager จริง** บน VPS ตามข้อ 4.1 โดยชี้ `CC_RELEASE_URL` ที่ registry ในเครื่อง (`python3 -m http.server 8000 --bind 127.0.0.1 -d <registry>` บน VPS เอง) · ไล่ตารางข้อ 2.1–2.6 ทีละแถวและจดผลลงในไฟล์นี้ (ข้อ 7)
+4. **push เฉพาะที่ผ่าน** เข้า `main` · ลำดับ: `hello` 1.0.0 → promote stable → ตรวจ raw URL ด้วย curl จริง → ค่อยตัวอื่น (commit ละ 1 release เพื่อ revert/อ้างอิงง่าย)
+5. **ลองกับ registry จริง** (HTTPS, cache 5 นาที, `+` ใน URL) โดยตั้ง `CC_RELEASE_URL` ชี้ GitHub raw
+6. **manager** (ข้อ 2.7): ทำบน VPS (Ubuntu + systemd) ทีหลัง plugin
+7. **branch `negative`** (ข้อ 3) ทำสุดท้าย
+
+### 4.1 CRM จำลองบน VPS (ไม่มี CRM จริง)
+
+ใช้ `examples/center` เป็น CRM จำลอง วางบน VPS **เครื่องเดียวกับ manager** · ไม่ต้องแก้โค้ดและไม่ต้องเปิดพอร์ตให้ใคร เพราะ dev cert ของ center ใช้ได้กับ `127.0.0.1` อยู่แล้ว
+(checklist เต็มของโปรเจกต์อยู่ที่ README ของ edgeconnector หัวข้อ "ทดสอบกับ registry บน GitHub" · เปลี่ยนชื่อ key จาก `release-2026` เป็น `lab-2026`)
+
+```bash
+# บนเครื่องพัฒนา: build center สำหรับ linux/amd64 (VPS เป็น x86_64) แล้วส่งขึ้น VPS
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o /tmp/center ./examples/center
+scp /tmp/center <user>@<vps>:~/center
+
+# บน VPS: ผูกกับ 127.0.0.1 ทั้ง gRPC และ admin (admin HTTP ไม่มีรหัสผ่านที่ /admin/ จึงห้ามเปิดออกนอกเครื่อง)
+mkdir -p ~/center-data && cd ~/center-data
+~/center -data ~/center-data -addr 127.0.0.1:7443 -admin 127.0.0.1:8080 -ui-password '<รหัส>' \
+  -release-url http://127.0.0.1:8000 -manager-server-addr 127.0.0.1:7443
+# ค้างไว้ใน tmux/screen (หรือทำ systemd unit ถ้าจะใช้นาน)
+
+# เปิด UI จากเครื่องพัฒนาผ่าน SSH tunnel (ไม่เปิดพอร์ต 8080 ให้ภายนอก)
+ssh -L 8080:127.0.0.1:8080 <user>@<vps>      # แล้วเปิด http://localhost:8080/ui/
+
+# ติดตั้ง manager บน VPS: คำสั่ง curl จากหน้า Add manager ต่อท้ายด้วย CA ของ center
+#   --ca-cert-file ~/center-data/certs/ca.pem
+```
+
+ข้อควรระวัง:
+- `-release-url` ใช้ได้ทั้ง `http://127.0.0.1:8000` (registry ในเครื่อง ลองได้เร็ว ไม่มี cache) และ GitHub raw (`https://raw.githubusercontent.com/MaiWittawat/edgeconnector-registry/main` ลองของจริง) · manager ต้องตั้ง `CC_RELEASE_URL` ให้ชี้ที่เดียวกับที่ต้องการลอง (คำสั่ง curl ใส่ `--base-url` ให้ตาม `-release-url` ของ center)
+- ข้อมูล center (token, connector) อยู่ใน `~/center-data/store.json` · ลบแล้วเริ่มใหม่ได้ แต่ manager ที่ enroll ไว้จะใช้ไม่ได้ ต้อง `--reenroll`
+- ถ้า VPS มี firewall/ufw อยู่แล้วไม่ต้องแก้อะไร เพราะไม่มีพอร์ตไหนฟังนอก 127.0.0.1
+
+---
+
+## 5. สิ่งที่ "ไม่ต้องทำ" (ซ้ำกับ unit test หรือไม่ได้ประโยชน์)
+
+- ปล่อย `hello` หลายสิบ version เพื่อดู UI → ใช้ `index.json` ที่สร้างเองใน registry ในเครื่องแทน (`maxReleaseRows` ตัดแถวเกิน; ไม่ต้องมีไฟล์จริง)
+- ทดสอบ redirect เปลี่ยน scheme (https→http) กับ GitHub raw → GitHub ไม่ทำแบบนั้น · `TestFetchRejectsSchemeDowngradeRedirect` ครอบคลุมแล้ว
+- release ของชื่อ `manager` แบบ plugin → ชื่อสงวน ถูกปฏิเสธตั้งแต่ก่อนแตะ network (`TestInstallReservedName`)
+- ลองกับ Windows → โปรเจกต์ไม่มี target windows
+
+---
+
+## 6. การตัดสินใจ
+
+**ตัดสินใจแล้ว**
+- platform: Linux อย่างเดียว · VPS เป็น `x86_64` = `linux_amd64`
+- เพิ่ม `startDelay` / `crashAfter` ใน hello-plugin: ทำแล้ว (PR #11)
+- การเรียง version ใน UI: เรียงแบบ semver (PR #10)
+- มีเครื่อง Linux: Ubuntu VPS + CRM จำลองบนเครื่องเดียวกัน (ข้อ 4.1)
+- branch `negative`: ทำ (ข้อ 3)
+- กรณี version (`t-ver` ข้อ 2.4): ทำ
+
+**ยังค้าง:** ไม่มี · ต้อง merge PR #10, #11 ก่อน แล้วเริ่มข้อ 4 ได้
+
+---
+
+## 7. บันทึกผลทดสอบ (กรอกเมื่อทำแต่ละข้อ)
+
+| รหัส | release | ผล | วันที่ | หมายเหตุ |
+|---|---|---|---|---|
+| H-1 | hello 1.0.0 ติดตั้งครั้งแรก | – | – | |
+| H-2 | hello 1.1.0 อัปเกรด + rollback | – | – | |
+| H-3 | hello 1.2.0 พัง (ทับ 1.1.0 / เครื่องใหม่) | – | – | |
+| T-KEY | hello 1.3.0 ลายเซ็น lab-2027 | – | – | |
+| SC-1 | scope: manager token มี `dnc:read` แล้วติดตั้ง hello ด้วย `scopes:["admin"]` ต้องล้ม (เกินเพดาน) · ด้วย `["dnc:read"]` ผ่าน · ลดของ manager ใน UI แล้ว scope ของ plugin ถูกตัด (ใช้ hello 1.0.0 ไม่ต้องมี release เพิ่ม) | – | – | |
+| S-1 | t-hang / t-exit / t-noterm | – | – | |
+| V-1 | t-ver (`+`, `1.10.0`, `v1`) | – | – | |
+| P-1 | t-otherarch บน VPS (arch ไม่ตรง) | – | – | |
+| C-1 | channel stable/beta | – | – | |
+| M-1 | manager 1.0.0 install-manager.sh | – | – | |
+| M-2 | manager 1.1.0 self-update | – | – | |
+| M-3 | manager 1.2.0-bad-exit / 1.2.1-bad-hang | – | – | |
+| N-1 | branch negative | – | – | |
