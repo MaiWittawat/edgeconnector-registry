@@ -1,0 +1,12 @@
+{
+  "name": "manager",
+  "version": "1.2.1-bad-hang",
+  "os": "linux",
+  "arch": "amd64",
+  "artifact": {
+    "sha256": "3c69f8d72e2f2b683567531f22aba0f18652d0a11937d590909adc75a259a671",
+    "signature": "1gP0zzmjTW2hDgZ6eXeBnH+YxEnM8V9KjHrs88j9bYfUcssjwg3qqOrSTTWA8t1ab2hLRk4x/Rdin+n18SW+BQ==",
+    "keyId": "lab-2026",
+    "size": "139"
+  }
+}

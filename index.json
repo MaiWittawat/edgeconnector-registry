@@ -40,6 +40,9 @@
         ],
         "1.2.0-bad-exit": [
           "linux_amd64"
+        ],
+        "1.2.1-bad-hang": [
+          "linux_amd64"
         ]
       },
       "channels": {
