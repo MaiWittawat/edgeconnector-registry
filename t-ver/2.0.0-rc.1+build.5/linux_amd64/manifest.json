@@ -1,0 +1,12 @@
+{
+  "name": "t-ver",
+  "version": "2.0.0-rc.1+build.5",
+  "os": "linux",
+  "arch": "amd64",
+  "artifact": {
+    "sha256": "607b243a95d6ce97e565e0a155f11e84881d61d3f208bc7ea056d623d453371d",
+    "signature": "nAIQldLupxfRUVeChMwiycIkfNjU8PsXB82s8rphwbCIdwMFEVaZgqoIdorPbMt9S6pkozTkV/XNiF6xjv9MDA==",
+    "keyId": "lab-2026",
+    "size": "5311990"
+  }
+}

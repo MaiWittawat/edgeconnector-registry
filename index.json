@@ -94,6 +94,13 @@
           "linux_amd64"
         ]
       }
+    },
+    "t-ver": {
+      "versions": {
+        "2.0.0-rc.1+build.5": [
+          "linux_amd64"
+        ]
+      }
     }
   }
 }
