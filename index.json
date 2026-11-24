@@ -5,9 +5,13 @@
         "1.0.0": [
           "linux_amd64",
           "linux_arm64"
+        ],
+        "1.1.0": [
+          "linux_amd64"
         ]
       },
       "channels": {
+        "beta": "1.1.0",
         "stable": "1.0.0"
       }
     },
