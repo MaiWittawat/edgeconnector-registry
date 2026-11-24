@@ -37,6 +37,9 @@
         "1.1.0": [
           "linux_amd64",
           "linux_arm64"
+        ],
+        "1.2.0-bad-exit": [
+          "linux_amd64"
         ]
       },
       "channels": {
