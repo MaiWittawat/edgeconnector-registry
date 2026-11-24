@@ -1,0 +1,12 @@
+{
+  "name": "t-0000000000000000000000000000000000000000000000000000000000000",
+  "version": "1.0.0",
+  "os": "linux",
+  "arch": "amd64",
+  "artifact": {
+    "sha256": "b7e25ed396fd325fa94518e2e46e11c645cd6571ebbe56a3f60517e7f628d353",
+    "signature": "vew2eGBeCzvt1KHScopSXHH7WfTKxI+cmHHyFgHtf7SUwwZizmfR6SJFT1iD4mSg7/q0SvWfovuXBxlJ5quUBg==",
+    "keyId": "lab-2026",
+    "size": "135"
+  }
+}
