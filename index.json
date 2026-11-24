@@ -67,6 +67,13 @@
         ]
       }
     },
+    "t-otherarch": {
+      "versions": {
+        "1.0.0": [
+          "linux_arm64"
+        ]
+      }
+    },
     "t-slow": {
       "versions": {
         "1.0.0": [

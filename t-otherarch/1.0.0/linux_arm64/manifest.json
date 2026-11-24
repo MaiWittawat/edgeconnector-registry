@@ -1,0 +1,12 @@
+{
+  "name": "t-otherarch",
+  "version": "1.0.0",
+  "os": "linux",
+  "arch": "arm64",
+  "artifact": {
+    "sha256": "54811a74f34792d2a85c7e7884f193e9f243a57925cdee02da2aa65023d0cbaf",
+    "signature": "MJCStt7MEg2eFqTSlwc2tWRpxLkUJl7I8bCJ4jx+tt5COXjGodkYDQdsQ09//XWDxpwRZWAh4Gyy3lrFTYveDw==",
+    "keyId": "lab-2026",
+    "size": "143"
+  }
+}
