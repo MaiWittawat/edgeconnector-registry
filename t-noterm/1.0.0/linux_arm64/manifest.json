@@ -1,0 +1,12 @@
+{
+  "name": "t-noterm",
+  "version": "1.0.0",
+  "os": "linux",
+  "arch": "arm64",
+  "artifact": {
+    "sha256": "9ebcbca96fb6d6a7fa2b0b87610119665e7cf56687d777a56512106655b11728",
+    "signature": "ZPPFVAmefQi3joQVXiY1CSRdpAicR57rMqFftgkNnYCSenXpdiCkeuqjimFp+B1UFx7HEAB1v2iAbl64suuRBg==",
+    "keyId": "lab-2026",
+    "size": "165"
+  }
+}
