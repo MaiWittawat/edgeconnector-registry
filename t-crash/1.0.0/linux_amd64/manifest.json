@@ -1,0 +1,12 @@
+{
+  "name": "t-crash",
+  "version": "1.0.0",
+  "os": "linux",
+  "arch": "amd64",
+  "artifact": {
+    "sha256": "ecdeb496132e02ac04605bfa1478abf6479f91d6e30759cb83991468d2ad0de0",
+    "signature": "83sEgb2cUN5eu1IrJ8SucoqW1X+c9KwkaC3xAEeB/OlVy/8h4SV6q/SonJPbALsN+I44+HmI4W10dAEa18HWBg==",
+    "keyId": "lab-2026",
+    "size": "5311701"
+  }
+}
