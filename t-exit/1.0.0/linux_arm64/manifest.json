@@ -1,0 +1,12 @@
+{
+  "name": "t-exit",
+  "version": "1.0.0",
+  "os": "linux",
+  "arch": "arm64",
+  "artifact": {
+    "sha256": "53047b0db54af00ceddc77d0473e5a02652a5de0f5ddbd8fc56ea092e363ff7b",
+    "signature": "StZXkb68sG9pOod/fkHGK4tDXtO6mknZPIZYr3e4pnVHXptNg5dYSC0iC+EGDGawsR4tLK2TH42K4LbV9P51Ag==",
+    "keyId": "lab-2026",
+    "size": "146"
+  }
+}
