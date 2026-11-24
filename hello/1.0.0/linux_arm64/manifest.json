@@ -1,0 +1,12 @@
+{
+  "name": "hello",
+  "version": "1.0.0",
+  "os": "linux",
+  "arch": "arm64",
+  "artifact": {
+    "sha256": "e733c9e19806156521edbd0f87b4593e8906523de800ec0568aa9d9f8db05303",
+    "signature": "abiUPZu9BsFjn6XWwPFpfvRwSIFKSIjWLtj+saTp1Pc8ZYpUEFJqi80GeHpq6LO75NL4abgL9HPZ5+f764KrCQ==",
+    "keyId": "lab-2026",
+    "size": "4796826"
+  }
+}

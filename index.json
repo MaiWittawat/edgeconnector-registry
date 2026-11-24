@@ -1,5 +1,16 @@
 {
   "plugins": {
+    "hello": {
+      "versions": {
+        "1.0.0": [
+          "linux_amd64",
+          "linux_arm64"
+        ]
+      },
+      "channels": {
+        "stable": "1.0.0"
+      }
+    },
     "manager": {
       "versions": {
         "1.0.0": [
