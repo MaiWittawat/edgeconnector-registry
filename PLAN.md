@@ -5,7 +5,7 @@
 (ตั้งแต่ 2026-11-25 manager แยกไปอยู่ repo `edgeconnector-manager` · release ของ manager ตั้งแต่ 1.3.0 build จาก repo นั้น)
 
 > สถานะ (2026-11-25): **release ทั้งหมดของ branch `main` และ branch `negative`, `negative-bigindex` สร้างและ push แล้ว** · ยังไม่ได้ทดสอบกับ manager จริง (ตารางข้อ 7 ว่าง)
-> - `main`: 29 release ผ่าน `verify` (ใช้ `lab-2026` กับ `lab-2027`) · manager **1.3.0** เป็น `stable` (เดิม 1.0.0) · มี `install-manager.sh` (เขียนจาก repo edgeconnector-manager ตั้งแต่ 1.3.0) · ไฟล์ที่โหลดจาก raw มี sha256 ตรง manifest
+> - `main`: 31 release ผ่าน `verify` (รวม demo 1.0.0 = `stable` ของ demo) (ใช้ `lab-2026` กับ `lab-2027`) · manager **1.3.0** เป็น `stable` (เดิม 1.0.0) · มี `install-manager.sh` (เขียนจาก repo edgeconnector-manager ตั้งแต่ 1.3.0) · ไฟล์ที่โหลดจาก raw มี sha256 ตรง manifest
 > - `negative`: 10 ตัวที่เสียตามข้อ 3 · ลอง `Fetch` + `Extract` จริงแล้ว ได้ error ตามที่ตั้งใจทุกตัว · `verify` ล้ม (ตั้งใจ)
 > - `negative-bigindex`: `index.json` 1.2 MB (เกินขีด 1 MB)
 > - ข้อสังเกตจากการลอง: `t-nobin` ผ่านทั้ง `Fetch` และ `Extract` (แตกได้) แต่ไม่มี `bin/t-nobin` → manager ไม่รายงานว่า "ไม่มีไฟล์" ตรง ๆ จะเห็นเป็น plugin ไม่ healthy (ดู log จาก supervisor) ต่างจาก `manager.update` ที่ตรวจ `has no bin/manager` ให้
@@ -67,6 +67,14 @@ go run ./cmd/cc-release keygen -dir ~/cc-keys -id lab-2027
 | `1.3.0` | ปกติ แต่ **เซ็นด้วย `lab-2027`** | – | T-KEY: manager เชื่อ lab-2026 อย่างเดียว = ปฏิเสธ (`ErrUnknownKey`) · เชื่อทั้งสอง = ติดตั้งได้ (หมุน key) |
 
 ข้อสังเกต: 1.2.0 ต้องลองสองแบบ คือ (ก) ติดตั้งทับ 1.1.0 → ถอยกลับ, (ข) ติดตั้งบนเครื่องที่ **ยังไม่เคยมี hello** → error และไม่ทิ้งโฟลเดอร์ `plugins/hello` ว่างค้าง (โค้ดมีลบให้ ควรเห็นกับตาจริง)
+
+### 2.1b `demo` — plugin ตัวอย่างที่ใช้ข้อความครบ 5 ชนิด (ต้นฉบับ: `edgeconnector-plugin/plugins/demo`)
+
+hello ใช้ทดสอบเคสที่ผิดพลาด (อัปเกรด, rollback, ตัวพัง, key) และหยุดออก version ใหม่ · ทดสอบเคสปกติแบบครบวงให้ใช้ demo · ใช้คู่กับ center ตัวอย่างของ edgeconnector-sandbox (มี Call `dnc.check`, รับ Event `job.done`, ส่ง Notify ได้)
+
+| version | เนื้อหา | channel | กรณีที่ทดสอบ |
+|---|---|---|---|
+| `1.0.0` | demo จาก edgeconnector-plugin 962f451 · **linux amd64 + arm64** | `stable` | ติดตั้งพร้อม config + scope `dnc:read` · Request `version` / `greet` · Request `dnc.check` → Call ขึ้น center · Command `job.run` → Event `job.done` · job ซ้ำ = `already` · Notify `announce` เห็นใน `plugin.logs` · ถอด scope แล้ว `dnc.check` บอกว่าขาด `dnc:read` |
 
 ### 2.2 fixture แบบ shell script (ไม่ต้อง build Go · ไฟล์เล็กมาก · **ไม่ต้องแก้โค้ดใดเลย**)
 
@@ -239,4 +247,5 @@ ssh -L 8080:127.0.0.1:8080 <user>@<vps>      # แล้วเปิด http://l
 | M-2 | manager 1.1.0 self-update | – | – | |
 | M-3 | manager 1.2.0-bad-exit / 1.2.1-bad-hang | – | – | |
 | M-4 | manager 1.3.0 (stable) | ผ่านบางส่วน | 2026-11-25 | ลองใน sandbox (Docker, linux/arm64, ก่อน push จาก registry ในเครื่อง): image อ่าน stable ได้ 1.3.0 และตรวจลายเซ็นผ่าน · enroll · ติดตั้ง hello 1.0.0 จาก GitHub · `manager status` แสดง `center connected` · `plugin ls` healthy · ยังไม่ได้ลองบน VPS (systemd, install-manager.sh, self-update) |
+| D-1 | demo 1.0.0 (stable) ครบ 5 ชนิด | ผ่านใน sandbox | 2026-11-25 | Docker linux/arm64 · ติดตั้งจากสำเนาของ registry นี้ก่อน push (อ่าน `stable` ได้ 1.0.0) · `version`, `dnc.check` = `clean`, `job.run` → Event `job.done` · รอบก่อนปล่อย (build เดียวกัน) ลอง `greet`, job ซ้ำ = `already`, Notify, ถอด scope ครบแล้ว · ยังไม่ได้ลองบน VPS (amd64) |
 | N-1 | branch negative | – | – | |
