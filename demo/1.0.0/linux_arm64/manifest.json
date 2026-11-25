@@ -1,0 +1,12 @@
+{
+  "name": "demo",
+  "version": "1.0.0",
+  "os": "linux",
+  "arch": "arm64",
+  "artifact": {
+    "sha256": "a80d16dd7e964527309f5788c9f8f38644e8f2761d7b322821e677a1721b0508",
+    "signature": "ISUIk8JQo7hyusfdxkLaPM5tBMRdFNMasKtZqd/4pJM10DhhVnKJmqLlyWRmdE2R7DrrZiDFK2Xl6QvgKLCMAg==",
+    "keyId": "lab-2026",
+    "size": "4801098"
+  }
+}
