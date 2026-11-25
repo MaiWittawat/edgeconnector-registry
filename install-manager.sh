@@ -1,21 +1,28 @@
 #!/bin/sh
 # install-manager.sh = ติดตั้ง / อัปเกรด edgeconnector manager เป็น systemd service (Linux + systemd · POSIX sh)
 #
-#   curl -fsSL <RELEASE_URL>/install-manager.sh | sudo sh -s -- --token cce1.xxx --server crm.example.com:7443
+#   curl -fsSL <RELEASE_URL>/install-manager.sh | sudo sh -s -- --token cce1.xxx --server center.example.com:7443
 #
 # option:
 #   --token T            enrollment token ชนิด manager (หรือ env CC_TOKEN) · token ไม่ถูกเขียนลงดิสก์
-#   --server HOST:PORT   ที่อยู่ CRM (ติดตั้งครั้งแรกต้องมี)
+#   --server HOST:PORT   ที่อยู่ center (ติดตั้งครั้งแรกต้องมี)
 #   --version V          version ของ manager · ไม่ใส่ = ตาม channel
 #   --channel C          channel (ค่าเริ่มต้น stable)
 #   --base-url URL       registry (ค่าเริ่มต้น = RELEASE_URL ที่ฝังไว้)
 #   --trusted-key ID=B64 key ที่เชื่อถือ ใส่ซ้ำได้ (ค่าเริ่มต้น = TRUSTED_KEYS ที่ฝังไว้)
-#   --ca-cert-file F     CA ส่วนตัวของ CRM → คัดลอกไป /etc/edgeconnector/ca.pem
+#   --ca-cert-file F     CA ส่วนตัวของ center → คัดลอกไป /etc/edgeconnector/ca.pem
 #   --reenroll           ล้างตัวตนเดิมแล้ว enroll ใหม่ด้วย --token (ย้ายเครื่อง / กู้เครื่อง)
+#   --uninstall          หยุดและลบทุกอย่างของ edgeconnector ออกจากเครื่อง (ใช้คนเดียว ไม่รับ option อื่น · ดู uninstall ข้างล่าง)
+#
+# ถอนแบบ offline (เครื่องออกเน็ตไม่ได้): ตอนติดตั้ง script เก็บสำเนาจาก registry ไว้ที่ /usr/local/lib/edgeconnector/install-manager.sh
+#   sudo sh /usr/local/lib/edgeconnector/install-manager.sh --uninstall
+#
+# คำสั่งหน้างาน: script ติดตั้ง /usr/local/bin/edgeconnector (wrapper = scripts/edgeconnector) → sudo edgeconnector help
 #
 # ตอน publish `make manager-release` ฝังค่าลงไฟล์นี้แล้ววางที่รากของ registry:
 #   บรรทัด RELEASE_URL / TRUSTED_KEYS ด้านล่าง (placeholder ที่ไม่ถูกแทน = ถือว่าว่าง)
 #   บรรทัด @@MANAGER_GUARD@@ ใน write_guard = เนื้อหาของ scripts/manager-guard
+#   บรรทัด @@EDGECONNECTOR_CLI@@ ใน write_cli = เนื้อหาของ scripts/edgeconnector
 #
 # ขั้นตอน (ไม่แตะเครื่องจนกว่าจะตรวจ option, manifest, sha256 และลายเซ็นผ่าน):
 #   โหลด manifest + archive ของ manager → ตรวจ → แตกลง /opt/edgeconnector/manager/versions/<v> → manager.env →
@@ -28,6 +35,7 @@
 #   root แค่สร้างสองโฟลเดอร์นั้นครั้งแรก (ในโฟลเดอร์แม่ที่เป็นของ root) และอ่านว่ามีไฟล์อยู่ไหม
 #
 # test: INSTALL_MANAGER_DRY_RUN=1 = จบหลังตรวจผ่าน (พิมพ์ "verified manager <v> <os>_<arch>") ไม่แตะเครื่อง ·
+#       กับ --uninstall = พิมพ์คำสั่งที่จะรันทีละบรรทัด ("would run: ...") ไม่แตะเครื่อง ·
 #       INSTALL_MANAGER_PLATFORM=linux_amd64 = ใช้แทน uname
 set -eu
 umask 022
@@ -41,11 +49,15 @@ ETC=/etc/edgeconnector
 ENV_FILE=$ETC/manager.env
 CA_DEST=$ETC/ca.pem
 GUARD=/usr/local/lib/edgeconnector/manager-guard
+SCRIPT_COPY=/usr/local/lib/edgeconnector/install-manager.sh # สำเนาไว้ถอนแบบ offline
+CLI=/usr/local/bin/edgeconnector
 SERVICE=edgeconnector-manager
 UNIT_FILE=/etc/systemd/system/$SERVICE.service
+CHECK_UNIT=$SERVICE-update-check # timer ที่ manager-guard ตั้งตอนอัปเดตตัวเอง
 RUN_USER=edgeconnector
 MAX_MANIFEST=65536    # 64KB (เท่ากับฝั่ง Go)
 MAX_ARCHIVE=209715200 # 200MB
+MAX_SCRIPT=1048576    # 1MB (install-manager.sh ที่เก็บสำเนา)
 
 log() { echo "install-manager: $*"; }
 warn() { echo "install-manager: warning: $*" >&2; }
@@ -259,7 +271,7 @@ run_manager() {
 enroll() {
 	systemctl stop "$SERVICE" 2>/dev/null || true
 	if ! run_manager -enroll-only "$@"; then
-		restore_config # ตัวตนเดิมต้องกลับไปคู่กับ CRM / CA เดิม (เช่น token ผิดพร้อม --server ใหม่)
+		restore_config # ตัวตนเดิมต้องกลับไปคู่กับ center / CA เดิม (เช่น token ผิดพร้อม --server ใหม่)
 		systemctl start "$SERVICE" 2>/dev/null || true
 		die "enroll failed (the manager keeps its old identity, if any)"
 	fi
@@ -277,7 +289,7 @@ write_guard() {
 #   manager-guard count | rollback [สาเหตุ]   คำสั่งภายใน = งานไฟล์ใน SelfDir (root เรียกแล้วจะสลับเป็น user ของ manager เสมอ)
 #
 # อ่านไฟล์ที่ manager เขียนตอนอัปเดตตัวเอง (connectormanager/selfupdate.go) ใน CC_SELF_DIR (ค่าเริ่มต้น /opt/edgeconnector/manager):
-#   update/{previous,next,attempts}   มี update/ = manager ตัวใหม่ยังไม่ยืนยันว่าถึง CRM · แต่ละไฟล์ = ข้อความบรรทัดเดียว
+#   update/{previous,next,attempts}   มี update/ = manager ตัวใหม่ยังไม่ยืนยันว่าถึง center · แต่ละไฟล์ = ข้อความบรรทัดเดียว
 #   current -> versions/<v>            symlink แบบ relative
 #   update-failed                      guard เขียนเมื่อถอยกลับ (manager อ่าน → รายงานใน host.status → ลบ)
 #
@@ -405,7 +417,7 @@ on_start() {
 
 # timer: ครบเวลาแล้ว update/ ยังอยู่ = manager ตัวใหม่ไม่ยืนยัน → ถอยกลับแล้วเปิด manager ใหม่
 on_check() {
-	if file_work rollback "did not reach the CRM within $CHECK_AFTER seconds" && [ -z "${GUARD_NO_SYSTEMCTL:-}" ]; then
+	if file_work rollback "did not reach the center within $CHECK_AFTER seconds" && [ -z "${GUARD_NO_SYSTEMCTL:-}" ]; then
 		systemctl --no-block restart "$SERVICE" || log "could not restart $SERVICE"
 	fi
 }
@@ -422,6 +434,48 @@ rollback)
 esac
 exit 0
 MANAGER_GUARD_EOF
+}
+
+# เนื้อหาของ /usr/local/bin/edgeconnector (make manager-release แทนบรรทัด marker ด้วย scripts/edgeconnector)
+write_cli() {
+	cat >"$1" <<'EDGECONNECTOR_CLI_EOF'
+#!/bin/sh
+# edgeconnector = คำสั่งหน้างานบนเครื่องลูกค้า (sudo edgeconnector manager status | manager doctor | plugin ls | plugin install ... · ดู help)
+# install-manager.sh เขียนไฟล์นี้ไปที่ /usr/local/bin/edgeconnector (root 0755 · manager แก้ไม่ได้)
+#
+# ตัวคำสั่งจริงอยู่ใน binary ของ manager แต่ห้ามรัน binary นั้นเป็น root:
+#   /opt/edgeconnector/manager เป็นของ user edgeconnector (manager อัปเดตตัวเองได้) → plugin ที่ถูกเจาะวาง binary ไว้
+#   แล้วรอให้ root รัน = ยกระดับเป็น root ได้ · wrapper นี้จึงต้องรันด้วย root (อ่าน manager.env ที่ root อ่านได้คนเดียว)
+#   แล้วลดสิทธิ์เป็น edgeconnector ก่อน exec เสมอ (user เดียวกับ manager = อ่าน data dir และ control socket ได้)
+#
+# setsid -w: รัน binary ใน session ใหม่ที่ไม่มี controlling terminal · ไม่งั้น binary ที่ถูกแทน (จาก root shell เช่น sudo -i)
+#   ใช้ ioctl TIOCSTI ยัดคำสั่งเข้า shell ของ root ได้ · -w = รอแล้วคืน exit code เดิม · stdout ยังเป็น terminal (สียังทำงาน)
+#   ผลข้างเคียง: Ctrl-C ไม่ถึง CLI · คำสั่งอ่านจบเองภายใน 20 วินาที · คำสั่งที่เปลี่ยนเครื่อง (install รอได้ถึง 10 นาที)
+#   ทำต่อบน manager จนจบอยู่แล้วแม้ปิด terminal ไป ดูผลทีหลังด้วย plugin ls
+#
+# -cli นำหน้าทุกครั้ง: manager รุ่นที่ยังไม่มี CLI (เช่นหลัง manager-guard ถอยกลับ) ไม่รู้จัก flag นี้จึง exit ทันที
+# ถ้าส่ง "plugin ls" ไปตรง ๆ รุ่นเก่าจะมองเป็น argument เกินแล้ว "รัน manager ตัวที่สอง" (เปิด plugin ซ้ำ + แย่ง stream ของตัวจริง)
+#
+# path ตายตัว ไม่รับจาก env: ถ้าเครื่องตั้ง sudo ให้เก็บ env ไว้ ผู้เรียกจะเลือกไฟล์ให้ root อ่าน / binary ให้รันได้
+# test ใช้สำเนาของไฟล์นี้ที่แทนสองบรรทัดนี้ด้วย path ใน temp dir
+
+ENV_FILE=/etc/edgeconnector/manager.env
+BIN=/opt/edgeconnector/manager/current/bin/manager
+
+if [ "$(id -u)" != 0 ]; then
+	echo "edgeconnector: run with sudo: sudo edgeconnector $*" >&2
+	exit 1
+fi
+
+# ค่าเดียวกับที่ systemd ให้ manager (CC_DATA, CC_ADDR, ...) · บรรทัดละ KEY=VALUE (install-manager.sh เขียนแบบนั้นเสมอ)
+if [ -f "$ENV_FILE" ]; then
+	while IFS= read -r line || [ -n "$line" ]; do
+		case "$line" in [A-Za-z_]*=*) export "$line" ;; esac
+	done <"$ENV_FILE"
+fi
+
+exec runuser -u edgeconnector -- setsid -w "$BIN" -cli "$@"
+EDGECONNECTOR_CLI_EOF
 }
 
 # ExecStartPre=-+ : "+" = guard รันด้วย root (ใช้ systemctl ได้ · งานไฟล์ส่งต่อให้ user ของ manager) · "-" = guard พังก็ยังเปิด manager
@@ -464,7 +518,72 @@ wait_active() {
 	return 1
 }
 
+# ── ถอนการติดตั้ง ────────────────────────────────────────────
+
+# act CMD... = รันคำสั่ง · dry run = พิมพ์ว่าจะรันอะไรแทน (test ตรวจลำดับคำสั่งจากตรงนี้)
+act() {
+	if [ -n "$DRY_RUN" ]; then
+		log "would run: $*"
+	else
+		"$@"
+	fi
+}
+
+# connector id ของ manager (ไว้บอกให้ไป revoke ที่ center) · อ่านเป็น user ของ manager เพราะ DATA เป็นของ user นั้น
+manager_id() {
+	runuser -u "$RUN_USER" -- cat "$DATA/manager/identity.json" 2>/dev/null |
+		sed -n 's/.*"connector_id":[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1 | tr -cd 'A-Za-z0-9._-'
+}
+
+# uninstall = ลบทุกอย่างที่ script นี้และ manager สร้างไว้บนเครื่อง (ลูกค้าเลิกใช้ / ไม่ต่อสัญญา) · ไม่เก็บอะไรไว้
+#   หยุด service (KillMode=control-group = plugin ทุกตัวที่ manager เปิดไว้หยุดไปด้วย) + timer ของการอัปเดตที่ค้าง →
+#   ฆ่า process ของ user edgeconnector ที่ยังเหลือ → ลบ unit → ลบ 4 โฟลเดอร์ (โปรแกรม, ตัวตน, plugin + data, config, guard) →
+#   ลบ user/group edgeconnector
+# ฆ่า process ก่อนลบเสมอ: หลังจากนั้นไม่มีใครเปลี่ยนของในโฟลเดอร์ของ manager ได้ระหว่างที่ root ลบ (กันการสลับเป็น symlink)
+# ฝั่ง center ไม่ถูกแตะ: connector ของ manager และ plugin ยังอยู่จนกว่าจะ revoke ที่ center
+uninstall() {
+	cd /
+	mid=
+	if [ -z "$DRY_RUN" ]; then
+		[ "$(id -u)" = 0 ] || die "run as root: curl ... | sudo sh -s -- --uninstall"
+		for cmd in systemctl runuser; do
+			command -v "$cmd" >/dev/null 2>&1 || die "$cmd not found (Linux with systemd and util-linux is required)"
+		done
+		for dir in /opt/edgeconnector /var/lib/edgeconnector "$ETC" /usr/local/lib/edgeconnector; do
+			check_root_dir "$dir"
+		done
+		if id -u "$RUN_USER" >/dev/null 2>&1; then mid=$(manager_id || true); fi
+	fi
+
+	act systemctl stop "$CHECK_UNIT.timer" "$CHECK_UNIT.service" 2>/dev/null || true
+	act systemctl disable --now "$SERVICE" 2>/dev/null || true
+	act pkill -KILL -u "$RUN_USER" 2>/dev/null || true
+	act rm -f "$UNIT_FILE"
+	act rm -f "$CLI"
+	act systemctl daemon-reload || true
+	act systemctl reset-failed "$SERVICE" 2>/dev/null || true
+	act rm -rf /opt/edgeconnector /var/lib/edgeconnector "$ETC" /usr/local/lib/edgeconnector
+	if [ -n "$DRY_RUN" ] || id -u "$RUN_USER" >/dev/null 2>&1; then
+		act userdel "$RUN_USER" || warn "could not remove user $RUN_USER"
+	fi
+	act groupdel "$RUN_USER" 2>/dev/null || true # useradd --user-group: ปกติ userdel ลบ group ให้แล้ว
+
+	log "edgeconnector manager, its plugins and all their data were removed from this machine"
+	if [ -n "$mid" ]; then
+		log "revoke manager $mid (and its plugins) in the center"
+	else
+		log "revoke this machine's manager (and its plugins) in the center"
+	fi
+}
+
 # ── option ───────────────────────────────────────────────────
+
+DRY_RUN=${INSTALL_MANAGER_DRY_RUN:-}
+if [ "${1:-}" = --uninstall ]; then
+	[ $# -eq 1 ] || die "--uninstall takes no other options"
+	uninstall
+	exit 0
+fi
 
 TOKEN=${CC_TOKEN:-}
 SERVER=
@@ -484,6 +603,7 @@ while [ $# -gt 0 ]; do
 	--token | --server | --version | --channel | --base-url | --trusted-key | --ca-cert-file)
 		[ $# -ge 2 ] || die "$1 needs a value"
 		;;
+	--uninstall) die "--uninstall takes no other options" ;;
 	*) die "unknown option: $1" ;;
 	esac
 	case "$1" in
@@ -524,7 +644,6 @@ valid_channel "$CHANNEL" || die "invalid channel: $CHANNEL"
 [ -z "$SERVER" ] || plain "$SERVER" || die "invalid --server: $SERVER"
 [ -z "$REENROLL" ] || [ -n "$TOKEN" ] || die "--reenroll needs --token"
 
-DRY_RUN=${INSTALL_MANAGER_DRY_RUN:-}
 if [ -n "${INSTALL_MANAGER_PLATFORM:-}" ]; then
 	PLATFORM=$INSTALL_MANAGER_PLATFORM
 else
@@ -570,8 +689,9 @@ if [ -z "$DRY_RUN" ]; then
 		[ ! -f "$DATA/manager/revoked.json" ] || die "this manager was revoked: pass --token <new manager enrollment token>"
 	fi
 	write_guard "$TMP/manager-guard"
-	[ "$(head -n 1 "$TMP/manager-guard")" = "#!/bin/sh" ] ||
-		die "this install-manager.sh has no manager-guard: use the one published in the registry (make manager-release)"
+	write_cli "$TMP/edgeconnector"
+	[ "$(head -n 1 "$TMP/manager-guard")" = "#!/bin/sh" ] && [ "$(head -n 1 "$TMP/edgeconnector")" = "#!/bin/sh" ] ||
+		die "this install-manager.sh is not the published one (missing embedded manager-guard / edgeconnector): use the one in the registry (make manager-release)"
 fi
 find_openssl
 
@@ -613,6 +733,16 @@ listing=$(tar -tzf "$TMP/manager.tar.gz") || die "cannot read $archive"
 [ "$listing" = "bin/
 bin/manager" ] || die "$archive must contain only bin/manager"
 log "verified manager $VERSION $PLATFORM"
+
+# สำเนาของ script นี้ไว้ถอนแบบ offline: curl | sh อ่านจาก stdin จึงคัดลอกตัวเองไม่ได้ → โหลดจากที่เดียวกับที่ลูกค้า curl
+# ไม่ได้ / ไม่ใช่ sh script = แค่เตือน (ติดตั้งต่อได้ · ถอนยังใช้ curl ได้)
+if fetch "$BASE/install-manager.sh" "$TMP/install-manager.sh" "$MAX_SCRIPT" 2>/dev/null &&
+	[ "$(head -n 1 "$TMP/install-manager.sh")" = "#!/bin/sh" ] && sh -n "$TMP/install-manager.sh" 2>/dev/null; then
+	log "fetched install-manager.sh (kept for offline --uninstall)"
+else
+	rm -f "$TMP/install-manager.sh"
+	warn "cannot download $BASE/install-manager.sh: offline --uninstall will not be available"
+fi
 if [ -n "$DRY_RUN" ]; then
 	exit 0
 fi
@@ -693,6 +823,10 @@ fi
 
 write_guard "$TMP/manager-guard"
 install_file "$TMP/manager-guard" "$GUARD" 0755 && CHANGED=1
+# ไม่เกี่ยวกับ service ที่รันอยู่ จึงไม่ตั้ง CHANGED
+mkdir -p "$(dirname "$CLI")"
+install_file "$TMP/edgeconnector" "$CLI" 0755 || true
+if [ -f "$TMP/install-manager.sh" ]; then install_file "$TMP/install-manager.sh" "$SCRIPT_COPY" 0755 || true; fi
 write_unit "$TMP/unit"
 if install_file "$TMP/unit" "$UNIT_FILE" 0644; then
 	CHANGED=1
@@ -702,7 +836,7 @@ systemctl enable --quiet "$SERVICE"
 
 if [ "$PREVIOUS" != "$VERSION" ]; then
 	# ติดตั้งด้วยมือทับการอัปเดตที่ค้างอยู่: หยุด timer ของมัน (switch ลบ update/ ให้)
-	systemctl stop edgeconnector-manager-update-check.timer 2>/dev/null || true
+	systemctl stop "$CHECK_UNIT.timer" 2>/dev/null || true
 	self_op switch "$VERSION" || die "cannot switch $SELF/current to $VERSION"
 	CHANGED=1
 	log "current -> versions/$VERSION"
@@ -715,7 +849,7 @@ if [ -z "$CHANGED" ]; then
 fi
 systemctl restart "$SERVICE" || true
 if wait_active; then
-	log "manager $VERSION is running"
+	log "manager $VERSION is running · check it with: sudo edgeconnector manager doctor"
 	exit 0
 fi
 if [ -n "$PREVIOUS" ]; then
