@@ -3,7 +3,11 @@
 เป้าหมาย: เลือกว่า "ควรปล่อย release อะไรลง registry นี้" เพื่อทดสอบทุกกรณีของ manager / UI / `cc-release` กับ registry จริง (GitHub raw)
 เขียนจากการอ่านโค้ดใน repo edgeconnector: `release/`, `cmd/cc-release`, `connectormanager/plugins.go`, `connectormanager/selfupdate.go`, `internal/supervisor`, `worker`, `examples/hello-plugin`, `connectorserver/ui/pages.go`
 
-> สถานะ: **แผนเท่านั้น ยังไม่ได้ build หรือ push อะไร** · registry ตอนนี้ว่าง (มีแค่ README.md)
+> สถานะ (2026-11-25): **release ทั้งหมดของ branch `main` และ branch `negative`, `negative-bigindex` สร้างและ push แล้ว** · ยังไม่ได้ทดสอบกับ manager จริง (ตารางข้อ 7 ว่าง)
+> - `main`: 27 release ผ่าน `verify` (ใช้ `lab-2026` กับ `lab-2027`) · manager 1.0.0 เป็น `stable` · มี `install-manager.sh` · ไฟล์ที่โหลดจาก raw มี sha256 ตรง manifest
+> - `negative`: 10 ตัวที่เสียตามข้อ 3 · ลอง `Fetch` + `Extract` จริงแล้ว ได้ error ตามที่ตั้งใจทุกตัว · `verify` ล้ม (ตั้งใจ)
+> - `negative-bigindex`: `index.json` 1.2 MB (เกินขีด 1 MB)
+> - ข้อสังเกตจากการลอง: `t-nobin` ผ่านทั้ง `Fetch` และ `Extract` (แตกได้) แต่ไม่มี `bin/t-nobin` → manager ไม่รายงานว่า "ไม่มีไฟล์" ตรง ๆ จะเห็นเป็น plugin ไม่ healthy (ดู log จาก supervisor) ต่างจาก `manager.update` ที่ตรวจ `has no bin/manager` ให้
 >
 > **ตัดสินใจแล้ว (2026-11-24):** ทดสอบบน Linux อย่างเดียว (ไม่ทำ darwin) · มี branch `negative` · ทำกรณี version (`t-ver`) ·
 > ไม่มี CRM จริง ใช้ `examples/center` (CRM จำลอง) วางบน Ubuntu VPS เครื่องเดียวกับ manager (ข้อ 4.1)
