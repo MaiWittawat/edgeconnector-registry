@@ -5,7 +5,7 @@
 (ตั้งแต่ 2026-11-25 manager แยกไปอยู่ repo `edgeconnector-manager` · release ของ manager ตั้งแต่ 1.3.0 build จาก repo นั้น)
 
 > สถานะ (2026-11-25): **release ทั้งหมดของ branch `main` และ branch `negative`, `negative-bigindex` สร้างและ push แล้ว** · ยังไม่ได้ทดสอบกับ manager จริง (ตารางข้อ 7 ว่าง)
-> - `main`: 31 release ผ่าน `verify` (รวม demo 1.0.0 = `stable` ของ demo) (ใช้ `lab-2026` กับ `lab-2027`) · manager **1.3.0** เป็น `stable` (เดิม 1.0.0) · มี `install-manager.sh` (เขียนจาก repo edgeconnector-manager ตั้งแต่ 1.3.0) · ไฟล์ที่โหลดจาก raw มี sha256 ตรง manifest
+> - `main`: 33 release ผ่าน `verify` (รวม demo 1.0.0 = `stable` ของ demo) (ใช้ `lab-2026` กับ `lab-2027`) · manager **1.3.1** เป็น `stable` (เดิม 1.0.0 → 1.3.0 → 1.3.1) · มี `install-manager.sh` (เขียนจาก repo edgeconnector-manager ตั้งแต่ 1.3.0) · ไฟล์ที่โหลดจาก raw มี sha256 ตรง manifest
 > - `negative`: 10 ตัวที่เสียตามข้อ 3 · ลอง `Fetch` + `Extract` จริงแล้ว ได้ error ตามที่ตั้งใจทุกตัว · `verify` ล้ม (ตั้งใจ)
 > - `negative-bigindex`: `index.json` 1.2 MB (เกินขีด 1 MB)
 > - ข้อสังเกตจากการลอง: `t-nobin` ผ่านทั้ง `Fetch` และ `Extract` (แตกได้) แต่ไม่มี `bin/t-nobin` → manager ไม่รายงานว่า "ไม่มีไฟล์" ตรง ๆ จะเห็นเป็น plugin ไม่ healthy (ดู log จาก supervisor) ต่างจาก `manager.update` ที่ตรวจ `has no bin/manager` ให้
@@ -135,7 +135,8 @@ build เป็น plugin ชื่อ `t-slow` / `t-crash` ด้วย `make p
 | `1.1.0` | manager จริง อีก version | `manager.update` 1.0.0 → 1.1.0: โหลด+ตรวจลายเซ็น → เขียน `update/` → สลับ `current` → ตัวใหม่ต่อ CRM ได้และ ack `host.status` → ลบ `update/` = สำเร็จ · `Already` ถ้าสั่ง version เดียวกันซ้ำ |
 | `1.2.0-bad-exit` | **shell script** `#!/bin/sh` → `exit 1` ใส่เป็น `bin/manager` | ตัวใหม่ crash วน → manager-guard นับ `attempts` แล้วถอยกลับ `previous` · ได้ `update-failed` ใน `host.status` |
 | `1.2.1-bad-hang` | **shell script** `sleep 3600` | ตัวใหม่ค้าง ไม่ต่อ CRM → ไม่ถึง `UpdateDeadline` (2 นาที) ก็ถูก guard/systemd timer ถอยกลับ · ตรวจว่าเครื่องกลับมาออนไลน์เอง |
-| `1.3.0` | manager จาก repo `edgeconnector-manager` (0df8d6c) · ใช้คำว่า center แทน CRM ใน log, CLI และ error · promote → `stable` | ติดตั้งด้วย `install-manager.sh` แบบไม่ใส่ `--version` (ได้ตาม stable) · `manager.update` 1.1.0 → 1.3.0 · CLI `sudo edgeconnector manager status` / `doctor` แสดง `center` · ลองใน sandbox แล้ว (container, arm64): enroll, ติดตั้ง hello 1.0.0, `manager status` / `plugin ls` ถูกต้อง |
+| `1.3.0` | manager จาก repo `edgeconnector-manager` (0df8d6c) · ใช้คำว่า center แทน CRM ใน log, CLI และ error · เคยเป็น `stable` | ติดตั้งด้วย `install-manager.sh` แบบไม่ใส่ `--version` (ได้ตาม stable) · `manager.update` 1.1.0 → 1.3.0 · CLI `sudo edgeconnector manager status` / `doctor` แสดง `center` · ลองใน sandbox แล้ว (container, arm64): enroll, ติดตั้ง hello 1.0.0, `manager status` / `plugin ls` ถูกต้อง |
+| `1.3.1` | แก้บั๊ก supervisor (edgeconnector-manager 9b8afc3): ฆ่าทั้ง process group ของ plugin · plugin ที่เปิด process ลูก (เช่น `t-hang`) ไม่ทำให้ `plugin.install` ค้างนานเป็นชั่วโมงอีก · promote → `stable` | ติดตั้งด้วย `install-manager.sh` (ได้ตาม stable) · `manager.update` 1.3.0 → 1.3.1 · S-1 `t-hang` ต้องล้มภายในไม่กี่วินาที ไม่มี `sleep` เหลือ |
 
 ข้อควรระวัง: version `1.2.x` ของ manager ที่เป็น script **อย่า promote เป็น `stable`** ไม่งั้นเครื่องที่ติดตั้งใหม่จะได้ตัวพัง · ลอง `--version` เท่านั้น
 manager ที่ build ด้วย `-X main.version=…` ต้องตรงกับ `MANAGER_VERSION` (make ทำให้เอง) ไม่งั้น `Already` ตัดสินผิด
@@ -248,4 +249,5 @@ ssh -L 8080:127.0.0.1:8080 <user>@<vps>      # แล้วเปิด http://l
 | M-3 | manager 1.2.0-bad-exit / 1.2.1-bad-hang | – | – | |
 | M-4 | manager 1.3.0 (stable) | ผ่านบางส่วน | 2026-11-25 | ลองใน sandbox (Docker, linux/arm64, ก่อน push จาก registry ในเครื่อง): image อ่าน stable ได้ 1.3.0 และตรวจลายเซ็นผ่าน · enroll · ติดตั้ง hello 1.0.0 จาก GitHub · `manager status` แสดง `center connected` · `plugin ls` healthy · ยังไม่ได้ลองบน VPS (systemd, install-manager.sh, self-update) |
 | D-1 | demo 1.0.0 (stable) ครบ 5 ชนิด | ผ่านใน sandbox | 2026-11-25 | Docker linux/arm64 · ติดตั้งจากสำเนาของ registry นี้ก่อน push (อ่าน `stable` ได้ 1.0.0) · `version`, `dnc.check` = `clean`, `job.run` → Event `job.done` · รอบก่อนปล่อย (build เดียวกัน) ลอง `greet`, job ซ้ำ = `already`, Notify, ถอด scope ครบแล้ว · ยังไม่ได้ลองบน VPS (amd64) |
+| M-5 | manager 1.3.1 กับ `t-hang` | ผ่านใน sandbox | 2026-11-25 | Docker linux/arm64 ก่อน push: `t-hang` (`start_timeout_sec` 3) ล้มใน 5 วินาที (1.3.0 ค้าง `pending` เป็นชั่วโมง) · ไม่มี `sleep 3600` เหลือ · คำสั่งถัดไป (ติดตั้ง demo) ทำได้ทันที · **เจอ:** ติดตั้งครั้งแรกที่ start ไม่ขึ้นทิ้งโฟลเดอร์ `plugins/t-hang` ไว้ (โค้ดลบให้เฉพาะตอนโหลดไม่ผ่าน) → H-3 แบบ (ข) จะเห็นแบบเดียวกัน · ยังไม่ได้ลองบน VPS |
 | N-1 | branch negative | – | – | |
