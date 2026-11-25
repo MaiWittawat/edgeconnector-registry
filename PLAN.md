@@ -2,9 +2,10 @@
 
 เป้าหมาย: เลือกว่า "ควรปล่อย release อะไรลง registry นี้" เพื่อทดสอบทุกกรณีของ manager / UI / `cc-release` กับ registry จริง (GitHub raw)
 เขียนจากการอ่านโค้ดใน repo edgeconnector: `release/`, `cmd/cc-release`, `connectormanager/plugins.go`, `connectormanager/selfupdate.go`, `internal/supervisor`, `worker`, `examples/hello-plugin`, `connectorserver/ui/pages.go`
+(ตั้งแต่ 2026-11-25 manager แยกไปอยู่ repo `edgeconnector-manager` · release ของ manager ตั้งแต่ 1.3.0 build จาก repo นั้น)
 
 > สถานะ (2026-11-25): **release ทั้งหมดของ branch `main` และ branch `negative`, `negative-bigindex` สร้างและ push แล้ว** · ยังไม่ได้ทดสอบกับ manager จริง (ตารางข้อ 7 ว่าง)
-> - `main`: 27 release ผ่าน `verify` (ใช้ `lab-2026` กับ `lab-2027`) · manager 1.0.0 เป็น `stable` · มี `install-manager.sh` · ไฟล์ที่โหลดจาก raw มี sha256 ตรง manifest
+> - `main`: 29 release ผ่าน `verify` (ใช้ `lab-2026` กับ `lab-2027`) · manager **1.3.0** เป็น `stable` (เดิม 1.0.0) · มี `install-manager.sh` (เขียนจาก repo edgeconnector-manager ตั้งแต่ 1.3.0) · ไฟล์ที่โหลดจาก raw มี sha256 ตรง manifest
 > - `negative`: 10 ตัวที่เสียตามข้อ 3 · ลอง `Fetch` + `Extract` จริงแล้ว ได้ error ตามที่ตั้งใจทุกตัว · `verify` ล้ม (ตั้งใจ)
 > - `negative-bigindex`: `index.json` 1.2 MB (เกินขีด 1 MB)
 > - ข้อสังเกตจากการลอง: `t-nobin` ผ่านทั้ง `Fetch` และ `Extract` (แตกได้) แต่ไม่มี `bin/t-nobin` → manager ไม่รายงานว่า "ไม่มีไฟล์" ตรง ๆ จะเห็นเป็น plugin ไม่ healthy (ดู log จาก supervisor) ต่างจาก `manager.update` ที่ตรวจ `has no bin/manager` ให้
@@ -118,13 +119,15 @@ build เป็น plugin ชื่อ `t-slow` / `t-crash` ด้วย `make p
 ### 2.7 `manager` — ตัวจริงของ manager (ต้อง Linux + systemd ถึงจะลองครบ)
 
 ปล่อยด้วย `make manager-release` (ได้ `install-manager.sh` ที่ราก registry ด้วย) · มีแค่ `linux_amd64` + `linux_arm64` ตามที่ target กำหนด
+1.0.0 – 1.2.1 build จาก repo edgeconnector (ก่อนแยก) · ตั้งแต่ 1.3.0 build จาก repo `edgeconnector-manager`
 
 | version | เนื้อหา | ทดสอบ |
 |---|---|---|
-| `1.0.0` | manager จริง · promote → `stable` | `curl … install-manager.sh \| sh` ติดตั้งครั้งแรกจริง (token, server, base-url) · manager-guard ถูกฝังใน script · systemd รัน `current/bin/manager` |
+| `1.0.0` | manager จริง · เคยเป็น `stable` (ถึง 2026-11-25) | `curl … install-manager.sh \| sh -s -- --version 1.0.0` ติดตั้งครั้งแรกจริง (token, server, base-url) · manager-guard ถูกฝังใน script · systemd รัน `current/bin/manager` |
 | `1.1.0` | manager จริง อีก version | `manager.update` 1.0.0 → 1.1.0: โหลด+ตรวจลายเซ็น → เขียน `update/` → สลับ `current` → ตัวใหม่ต่อ CRM ได้และ ack `host.status` → ลบ `update/` = สำเร็จ · `Already` ถ้าสั่ง version เดียวกันซ้ำ |
 | `1.2.0-bad-exit` | **shell script** `#!/bin/sh` → `exit 1` ใส่เป็น `bin/manager` | ตัวใหม่ crash วน → manager-guard นับ `attempts` แล้วถอยกลับ `previous` · ได้ `update-failed` ใน `host.status` |
 | `1.2.1-bad-hang` | **shell script** `sleep 3600` | ตัวใหม่ค้าง ไม่ต่อ CRM → ไม่ถึง `UpdateDeadline` (2 นาที) ก็ถูก guard/systemd timer ถอยกลับ · ตรวจว่าเครื่องกลับมาออนไลน์เอง |
+| `1.3.0` | manager จาก repo `edgeconnector-manager` (0df8d6c) · ใช้คำว่า center แทน CRM ใน log, CLI และ error · promote → `stable` | ติดตั้งด้วย `install-manager.sh` แบบไม่ใส่ `--version` (ได้ตาม stable) · `manager.update` 1.1.0 → 1.3.0 · CLI `sudo edgeconnector manager status` / `doctor` แสดง `center` · ลองใน sandbox แล้ว (container, arm64): enroll, ติดตั้ง hello 1.0.0, `manager status` / `plugin ls` ถูกต้อง |
 
 ข้อควรระวัง: version `1.2.x` ของ manager ที่เป็น script **อย่า promote เป็น `stable`** ไม่งั้นเครื่องที่ติดตั้งใหม่จะได้ตัวพัง · ลอง `--version` เท่านั้น
 manager ที่ build ด้วย `-X main.version=…` ต้องตรงกับ `MANAGER_VERSION` (make ทำให้เอง) ไม่งั้น `Already` ตัดสินผิด
@@ -235,4 +238,5 @@ ssh -L 8080:127.0.0.1:8080 <user>@<vps>      # แล้วเปิด http://l
 | M-1 | manager 1.0.0 install-manager.sh | – | – | |
 | M-2 | manager 1.1.0 self-update | – | – | |
 | M-3 | manager 1.2.0-bad-exit / 1.2.1-bad-hang | – | – | |
+| M-4 | manager 1.3.0 (stable) | ผ่านบางส่วน | 2026-11-25 | ลองใน sandbox (Docker, linux/arm64, ก่อน push จาก registry ในเครื่อง): image อ่าน stable ได้ 1.3.0 และตรวจลายเซ็นผ่าน · enroll · ติดตั้ง hello 1.0.0 จาก GitHub · `manager status` แสดง `center connected` · `plugin ls` healthy · ยังไม่ได้ลองบน VPS (systemd, install-manager.sh, self-update) |
 | N-1 | branch negative | – | – | |

@@ -6,7 +6,7 @@ This file guides Claude Code (claude.ai/code) when working in this repository.
 
 The static release registry of edgeconnector, the lab rewrite (not production): signed `manager` and plugin builds, served by `raw.githubusercontent.com`. This repo is **public** because managers download without logging in. Managers read it through `CC_RELEASE_URL=https://raw.githubusercontent.com/MaiWittawat/edgeconnector-registry/<branch>`.
 
-The code, `cc-release` and the Makefile targets live in the private repo `~/wittawat/lab/edgeconnector` (`github.com/MaiWittawat/edgeconnector`). There is nothing to build here. This repo only holds output. `README.md` and `PLAN.md` are in Thai; the user writes Thai, so answer in Thai.
+The code lives in two private repos next to this one (`~/wittawat/lab/edgeconnector/`, one `go.work`): `edgeconnector-pkg` (`github.com/MaiWittawat/edgeconnector`: the library, `cmd/cc-release`, `make plugin-release`, `examples/hello-plugin`, `examples/center`) and `edgeconnector-manager` (`github.com/MaiWittawat/edgeconnector-manager`: the manager and `make manager-release`). Manager releases up to 1.2.1 were built from edgeconnector-pkg; from 1.3.0 on they come from edgeconnector-manager. There is nothing to build here. This repo only holds output. `README.md` and `PLAN.md` are in Thai; the user writes Thai, so answer in Thai.
 
 `PLAN.md` is the test plan: which releases exist and why, what each one should do on the manager, and a results table (section 7). Record test results there and nowhere else.
 
@@ -35,8 +35,8 @@ Never merge `negative*` into `main`: one bad release in `main` makes `verify` fa
 - **Never edit registry files by hand** (manifest, archive, `index.json`, channels). Use `cc-release`. The only exception is the deliberately broken fixtures on `negative*`.
 - **A release is immutable.** `cc-release package` refuses to replace one, and a pushed release is in git history for good. A mistake means a new version. Before a push, you may delete the folder and rebuild.
 - **Ask before every `git push`.** The repo is public and releases cannot be taken back.
-- **Build from a clean commit**, never from a dirty tree: use a worktree of `origin/main` of the code repo (`git worktree add --detach <scratch>/wt-rel origin/main`), so the release can be rebuilt from its commit.
-- **Never promote a bad release to a channel.** `install-manager.sh` installs `manager/channels/stable.json`, so `stable` must always point at a good manager. `manager 1.2.x`, `hello 1.2.0` and every `t-*` fixture stay out of `stable` (except where `PLAN.md` says so).
+- **Build from a clean commit**, never from a dirty tree: build from a checkout that equals `origin/main` of the repo that holds the code (clean `git status`, `HEAD` = `origin/main`), or a worktree of it, so the release can be rebuilt from its commit. The manager's `go.mod` pins edgeconnector to a commit, so it rebuilds the same.
+- **Never promote a bad release to a channel.** `install-manager.sh` installs `manager/channels/stable.json`, so `stable` must always point at a good manager. `stable` is manager 1.3.0 since 2026-11-25. `manager 1.2.x`, `hello 1.2.0` and every `t-*` fixture stay out of `stable` (except where `PLAN.md` says so).
 - **Keys** live in `~/cc-keys` (outside every repo). Never read, print, copy or commit a `.key` file; hand the path to `cc-release` or `make`.
   - `lab-2026` signs everything. Public: `lab-2026=gK3QtGj9wHs/Vm07udIW31CySE3MVP5e/3dUj0aIXV8=`
   - `lab-2027` signs only `hello 1.3.0` (key rotation and untrusted-key tests). Public: `lab-2027=dwI8XQefhpJVcwBxgENp//zZaqNuLSBz2hVpdbd6YxI=`
@@ -46,13 +46,13 @@ Never merge `negative*` into `main`: one bad release in `main` makes `verify` fa
 
 ## How to publish a release
 
-Run from the worktree of the code repo. `REG` is this repo's path; `KEY` is `$HOME/cc-keys/lab-2026.key`.
+`REG` is this repo's path; `KEY` is `$HOME/cc-keys/lab-2026.key`. Plugins: run in edgeconnector-pkg. Manager: run in edgeconnector-manager. `cc-release` runs anywhere in the workspace as `go run github.com/MaiWittawat/edgeconnector/cmd/cc-release`. Go needs `GOPRIVATE` and `GONOSUMDB` to cover `github.com/MaiWittawat/*`.
 
 ```bash
 # plugin built from examples/hello-plugin (Linux only: the VPS is x86_64)
 make plugin-release NAME=hello PLUGIN_PKG=./examples/hello-plugin PLUGIN_VERSION=1.4.0 \
      REGISTRY=$REG KEY=$KEY PLATFORMS="linux/amd64"
-# manager + install-manager.sh (amd64 and arm64)
+# manager + install-manager.sh (amd64 and arm64), in edgeconnector-manager
 make manager-release MANAGER_VERSION=1.2.0 REGISTRY=$REG KEY=$KEY \
      RELEASE_URL=https://raw.githubusercontent.com/MaiWittawat/edgeconnector-registry/main \
      TRUSTED_KEYS=lab-2026=gK3QtGj9wHs/Vm07udIW31CySE3MVP5e/3dUj0aIXV8=
@@ -67,4 +67,4 @@ go run ./cmd/cc-release verify  -dir $REG -pubkey lab-2026=<b64>,lab-2027=<b64> 
 
 ## Where it is tested
 
-An Ubuntu VPS (`x86_64`, systemd, user `root`) runs the mock CRM `examples/center` from the code repo **on the same machine as the manager**, bound to `127.0.0.1` (gRPC `:7443`, admin `:8080`). The UI is reached with `ssh -L 8080:127.0.0.1:8080`. The admin HTTP API has no login, so never open it to the network. The manager is installed with the `curl ... install-manager.sh` command from the UI's Add manager page plus `--ca-cert-file`. Full steps: `PLAN.md` section 4.1 and the code repo README ("ทดสอบกับ registry บน GitHub").
+An Ubuntu VPS (`x86_64`, systemd, user `root`) runs the mock center `examples/center` from edgeconnector-pkg **on the same machine as the manager**, bound to `127.0.0.1` (gRPC `:7443`, admin `:8080`). The UI is reached with `ssh -L 8080:127.0.0.1:8080`. The admin HTTP API has no login, so never open it to the network. The manager is installed with the `curl ... install-manager.sh` command from the UI's Add manager page plus `--ca-cert-file`. Full steps: `PLAN.md` section 4.1 and the code repo README ("ทดสอบกับ registry บน GitHub").
