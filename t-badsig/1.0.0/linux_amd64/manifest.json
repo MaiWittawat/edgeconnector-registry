@@ -1,0 +1,12 @@
+{
+  "name": "t-badsig",
+  "version": "1.0.0",
+  "os": "linux",
+  "arch": "amd64",
+  "artifact": {
+    "sha256": "0000000000000000000000000000000000000000000000000000000000abcdef",
+    "signature": "UU0hy4rVigsVxz5TmktZIPjlq7kyPO2XUbQAqrasAGSR5pHPDHdk5GlMSllEBLMI2oyWidIWSx9w0LMWe0i3AA==",
+    "keyId": "lab-2026",
+    "size": "140"
+  }
+}

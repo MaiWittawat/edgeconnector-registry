@@ -1,0 +1,12 @@
+{
+  "name": "t-colon",
+  "version": "1.0:0",
+  "os": "linux",
+  "arch": "amd64",
+  "artifact": {
+    "sha256": "66715b8d9f9ca258008f99c300546031174c66b9741d4ac9748df37e9f4c79cf",
+    "signature": "d7M1diemNyVeV5tYzJk7maDZF17bFyJFEk6WYxEsUBgRFzOXUvFF1YguEPOgfHZZideqp0TgobQdVhg9lmjHAg==",
+    "keyId": "lab-2026",
+    "size": "139"
+  }
+}

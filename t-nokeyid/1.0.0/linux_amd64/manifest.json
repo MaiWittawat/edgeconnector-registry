@@ -1,0 +1,12 @@
+{
+  "name": "t-nokeyid",
+  "version": "1.0.0",
+  "os": "linux",
+  "arch": "amd64",
+  "artifact": {
+    "sha256": "bbab7e8c0f8685878b72fcfc62a5b7e1ca6c3f40ca2df987b1defd7097661f52",
+    "signature": "m5CXF7GejiFglafK576xMGmYc1DTDxC3p1bRLppPDPVQ32haciCdAMTYUkeolNyaqL/wZ2HYnByin8W+6mO9AQ==",
+    "keyId": "",
+    "size": "141"
+  }
+}

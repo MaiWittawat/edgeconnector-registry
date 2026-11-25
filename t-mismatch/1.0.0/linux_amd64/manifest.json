@@ -1,0 +1,12 @@
+{
+  "name": "t-mismatch",
+  "version": "1.0.1",
+  "os": "linux",
+  "arch": "amd64",
+  "artifact": {
+    "sha256": "04bbbcd2b8f0d1c170e9d0a78abdf0d5ad07e6519b3554e82a362ab6ac88eb9c",
+    "signature": "4d0/lkPDJV8zHaZthDI4HiNFsy7aK+YN2YfvC5YK0/2j2AlkwdbdWSV7ZVuTWp23z623UUAnukknDYlQeOO1Dw==",
+    "keyId": "lab-2026",
+    "size": "142"
+  }
+}

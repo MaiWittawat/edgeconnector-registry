@@ -1,0 +1,12 @@
+{
+  "name": "t-notgz",
+  "version": "1.0.0",
+  "os": "linux",
+  "arch": "amd64",
+  "artifact": {
+    "sha256": "837d944d0107eb4b11f9b83d68fe9ac730b21af2892fc6aa4504d2e98a0bb19d",
+    "signature": "n9ZCpa/gouAohTu98Rt9+njtJGL6Jk70MJSNUl1Ep1PaFNoOhGE9x00h8WqlrFrMIfh0mwFzQmt0mVkkSUdbDg==",
+    "keyId": "lab-2026",
+    "size": "24"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "t-nobin",
+  "version": "1.0.0",
+  "os": "linux",
+  "arch": "amd64",
+  "artifact": {
+    "sha256": "66d4831d5d940da67948a94d806c36b44786d6b5243ea1c4a6d0459945f6a34b",
+    "signature": "1h7e+8iMx1RSipydRDoLEzYak8DbGoWJbRyhqzP2SP3qfAG5kh5hCrbJdWBopMKNRUt1iuaGDHaVs/juMGrGBw==",
+    "keyId": "lab-2026",
+    "size": "146"
+  }
+}

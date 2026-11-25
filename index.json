@@ -56,6 +56,27 @@
         ]
       }
     },
+    "t-badsha": {
+      "versions": {
+        "1.0.0": [
+          "linux_amd64"
+        ]
+      }
+    },
+    "t-badsig": {
+      "versions": {
+        "1.0.0": [
+          "linux_amd64"
+        ]
+      }
+    },
+    "t-colon": {
+      "versions": {
+        "1.0.0": [
+          "linux_amd64"
+        ]
+      }
+    },
     "t-crash": {
       "versions": {
         "1.0.0": [
@@ -79,11 +100,39 @@
         ]
       }
     },
+    "t-mismatch": {
+      "versions": {
+        "1.0.0": [
+          "linux_amd64"
+        ]
+      }
+    },
+    "t-nobin": {
+      "versions": {
+        "1.0.0": [
+          "linux_amd64"
+        ]
+      }
+    },
+    "t-nokeyid": {
+      "versions": {
+        "1.0.0": [
+          "linux_amd64"
+        ]
+      }
+    },
     "t-noterm": {
       "versions": {
         "1.0.0": [
           "linux_amd64",
           "linux_arm64"
+        ]
+      }
+    },
+    "t-notgz": {
+      "versions": {
+        "1.0.0": [
+          "linux_amd64"
         ]
       }
     },
@@ -94,7 +143,28 @@
         ]
       }
     },
+    "t-size": {
+      "versions": {
+        "1.0.0": [
+          "linux_amd64"
+        ]
+      }
+    },
     "t-slow": {
+      "versions": {
+        "1.0.0": [
+          "linux_amd64"
+        ]
+      }
+    },
+    "t-symlink": {
+      "versions": {
+        "1.0.0": [
+          "linux_amd64"
+        ]
+      }
+    },
+    "t-traversal": {
       "versions": {
         "1.0.0": [
           "linux_amd64"

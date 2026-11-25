@@ -1,0 +1,12 @@
+{
+  "name": "t-traversal",
+  "version": "1.0.0",
+  "os": "linux",
+  "arch": "amd64",
+  "artifact": {
+    "sha256": "97c9c5bb6816987d541f3c6bc7b465b7d27f9974a3a5bbff98cd05a1f128d8a9",
+    "signature": "wssZ8BllvY+eXe49zwtnVyecnM41Ia2vQRMLipNhy9l772QUr2WtGoIQIh/Vkj0fE5xI8gYP5MIyWcmuBj5ZDQ==",
+    "keyId": "lab-2026",
+    "size": "181"
+  }
+}

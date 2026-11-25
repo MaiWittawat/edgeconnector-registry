@@ -1,0 +1,12 @@
+{
+  "name": "t-badsha",
+  "version": "1.0.0",
+  "os": "linux",
+  "arch": "amd64",
+  "artifact": {
+    "sha256": "96873a3fa175f74ecb88a78d322abbd943a7ad435871eb7b9489de82280c0186",
+    "signature": "s7SF+nc8E4kc+a7TuB8mWPny1GWRCdoHCUE+YVyrD1+XBGvQeagcNIQhqVTS1Zf3suPEPq/4sqHWM0REeaIVDQ==",
+    "keyId": "lab-2026",
+    "size": "140"
+  }
+}

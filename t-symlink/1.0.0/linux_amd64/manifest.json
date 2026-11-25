@@ -1,0 +1,12 @@
+{
+  "name": "t-symlink",
+  "version": "1.0.0",
+  "os": "linux",
+  "arch": "amd64",
+  "artifact": {
+    "sha256": "3a307a52ad380db9b14f3e305b42470722a95f045d62016aa3d0a3aeedd244a9",
+    "signature": "O4VlXzEoAwQFNHZhuJBmmTMHxhbU/2iFsNkE0mjD+x2EAwrLdgVyRyB4y4B4inCV+4Ijsx+NymdrLE8WulNvBg==",
+    "keyId": "lab-2026",
+    "size": "121"
+  }
+}
