@@ -5,7 +5,7 @@
 (ตั้งแต่ 2026-11-25 manager แยกไปอยู่ repo `edgeconnector-manager` · release ของ manager ตั้งแต่ 1.3.0 build จาก repo นั้น)
 
 > สถานะ (2026-11-25): **release ทั้งหมดของ branch `main` และ branch `negative`, `negative-bigindex` สร้างและ push แล้ว** · ยังไม่ได้ทดสอบกับ manager จริง (ตารางข้อ 7 ว่าง)
-> - `main`: 35 release ผ่าน `verify` (รวม demo 1.0.0 = `stable` ของ demo) (ใช้ `lab-2026` กับ `lab-2027`) · manager **1.3.1** เป็น `stable` (เดิม 1.0.0 → 1.3.0 → 1.3.1) · manager 1.4.0 (auto update) อยู่ใน registry แต่ยังไม่ promote · มี `install-manager.sh` (เขียนจาก repo edgeconnector-manager ตั้งแต่ 1.3.0) · ไฟล์ที่โหลดจาก raw มี sha256 ตรง manifest
+> - `main`: 39 release ผ่าน `verify` (รวม demo 1.0.0 = `stable` ของ demo) (ใช้ `lab-2026` กับ `lab-2027`) · manager **1.3.1** เป็น `stable` (เดิม 1.0.0 → 1.3.0 → 1.3.1) · manager 1.4.0 (auto update) อยู่ใน registry แต่ยังไม่ promote · มี `install-manager.sh` (เขียนจาก repo edgeconnector-manager ตั้งแต่ 1.3.0) · ไฟล์ที่โหลดจาก raw มี sha256 ตรง manifest
 > - `negative`: 10 ตัวที่เสียตามข้อ 3 · ลอง `Fetch` + `Extract` จริงแล้ว ได้ error ตามที่ตั้งใจทุกตัว · `verify` ล้ม (ตั้งใจ)
 > - `negative-bigindex`: `index.json` 1.2 MB (เกินขีด 1 MB)
 > - ข้อสังเกตจากการลอง: `t-nobin` ผ่านทั้ง `Fetch` และ `Extract` (แตกได้) แต่ไม่มี `bin/t-nobin` → manager ไม่รายงานว่า "ไม่มีไฟล์" ตรง ๆ จะเห็นเป็น plugin ไม่ healthy (ดู log จาก supervisor) ต่างจาก `manager.update` ที่ตรวจ `has no bin/manager` ให้
@@ -99,6 +99,15 @@ shell script ทำ "healthy แล้วค่อยพังทีหลัง
 
 build เป็น plugin ชื่อ `t-slow` / `t-crash` ด้วย `make plugin-release NAME=t-slow PLUGIN_PKG=./examples/hello-plugin …` (ชื่อ plugin ไม่ต้องตรงกับชื่อโฟลเดอร์ใน `examples/`) · `crashAfter` ต้องนานกว่าเวลาเริ่มจริง (แนะนำ 5s ขึ้นไป) ไม่งั้นตายก่อน healthy เหมือน `broken`
 
+### 2.3b `t-auto` — ไว้ทดสอบอัปเดต plugin อัตโนมัติ (manager 1.4.0)
+
+hello-plugin ธรรมดา 2 version บน **linux amd64 + arm64** (build จาก `fixtures/catalog.txt` ของ edgeconnector-plugin) · `stable` ชี้ 1.1.0 ถาวร จึงไม่ต้องย้าย `stable` ของ hello เพื่อทดสอบ
+
+| version | channel | ทดสอบ |
+|---|---|---|
+| `1.0.0` | – | ติดตั้งด้วยมือเป็นจุดเริ่ม · เปิด `plugin.auto_update t-auto on` + ตารางของเครื่อง → รอบถัดไปต้องอัปเดตขึ้น 1.1.0 เอง |
+| `1.1.0` | `stable` | เป้าหมายของรอบ · ติดตั้ง 1.1.0 อยู่แล้ว = รอบไม่ทำอะไร (ไม่มี Event) · ถอยด้วยมือเป็น 1.0.0 ขณะสวิตช์เปิด = `skip_version` 1.1.0 รอบถัดไปไม่ขึ้น |
+
 ### 2.4 ชื่อและ version ที่เป็นกรณีขอบ
 
 | ปล่อยอะไร | กรณีที่ทดสอบ |
@@ -121,6 +130,7 @@ build เป็น plugin ชื่อ `t-slow` / `t-crash` ด้วย `make p
 | channel | ชี้ไป | ทดสอบ |
 |---|---|---|
 | `hello/channels/stable.json` | 1.0.0 | UI แสดงป้าย stable ที่ version นั้น |
+| `t-auto/channels/stable.json` | 1.1.0 | เป้าหมายของรอบ auto update (ข้อ 2.3b) |
 | `hello/channels/beta.json` | 1.1.0 | หลาย channel คนละ version · `promote` ใหม่ = ย้ายป้ายได้ (channel เป็นของที่แก้ได้ ต่างจาก release) |
 | – | – | สั่งติดตั้ง version ชื่อ `stable` ผ่าน CRM = ต้องล้ม "not published" (manager/CRM **ไม่แปลง channel เป็น version** · `install-manager.sh` เท่านั้นที่อ่าน channel) |
 
@@ -137,7 +147,7 @@ build เป็น plugin ชื่อ `t-slow` / `t-crash` ด้วย `make p
 | `1.2.1-bad-hang` | **shell script** `sleep 3600` | ตัวใหม่ค้าง ไม่ต่อ CRM → ไม่ถึง `UpdateDeadline` (2 นาที) ก็ถูก guard/systemd timer ถอยกลับ · ตรวจว่าเครื่องกลับมาออนไลน์เอง |
 | `1.3.0` | manager จาก repo `edgeconnector-manager` (0df8d6c) · ใช้คำว่า center แทน CRM ใน log, CLI และ error · เคยเป็น `stable` | ติดตั้งด้วย `install-manager.sh` แบบไม่ใส่ `--version` (ได้ตาม stable) · `manager.update` 1.1.0 → 1.3.0 · CLI `sudo edgeconnector manager status` / `doctor` แสดง `center` · ลองใน sandbox แล้ว (container, arm64): enroll, ติดตั้ง hello 1.0.0, `manager status` / `plugin ls` ถูกต้อง |
 | `1.3.1` | แก้บั๊ก supervisor (edgeconnector-manager 9b8afc3): ฆ่าทั้ง process group ของ plugin · plugin ที่เปิด process ลูก (เช่น `t-hang`) ไม่ทำให้ `plugin.install` ค้างนานเป็นชั่วโมงอีก · promote → `stable` | ติดตั้งด้วย `install-manager.sh` (ได้ตาม stable) · `manager.update` 1.3.0 → 1.3.1 · S-1 `t-hang` ต้องล้มภายในไม่กี่วินาที ไม่มี `sleep` เหลือ |
-| `1.4.0` | อัปเดต plugin อัตโนมัติตามวันและเวลา (edgeconnector-manager 92f869a): Command `manager.auto_update` / `plugin.auto_update`, Event `auto_update`, CLI `manager auto-update` / `plugin auto-update` · ขึ้นอย่างเดียวตาม channel `stable` ของ plugin · `install-manager.sh` เหมือน 1.3.1 ทุกบรรทัด · **ยังไม่ promote** จนกว่าจะผ่าน M-6 | `manager.update` 1.3.1 → 1.4.0 · M-6: ติดตั้ง hello 1.0.0 · ตั้ง `manager.auto_update` ให้ถึงเวลาในอีก 2 นาที + `plugin.auto_update hello on` · ต้องมี `stable` ของ hello สูงกว่า 1.0.0 (บน main ตอนนี้ `stable` = 1.0.0): ใช้สำเนา registry ในเครื่องที่ promote hello `stable` → 1.1.0 (manager ชี้ `http://127.0.0.1:8000`) ห้าม promote บน main เพื่อทดสอบ → รอบอัปเดตขึ้น 1.1.0 เอง และได้ Event `auto_update` done · ปิดตารางแล้วไม่มีรอบ · `sudo edgeconnector manager auto-update` / `plugin ls` คอลัมน์ AUTO |
+| `1.4.0` | อัปเดต plugin อัตโนมัติตามวันและเวลา (edgeconnector-manager 92f869a): Command `manager.auto_update` / `plugin.auto_update`, Event `auto_update`, CLI `manager auto-update` / `plugin auto-update` · ขึ้นอย่างเดียวตาม channel `stable` ของ plugin · `install-manager.sh` เหมือน 1.3.1 ทุกบรรทัด · **ยังไม่ promote** จนกว่าจะผ่าน M-6 | `manager.update` 1.3.1 → 1.4.0 · M-6: ติดตั้ง `t-auto` 1.0.0 (ข้อ 2.3b) · ตั้ง `manager.auto_update` ให้ถึงเวลาในอีก 2 นาที + `plugin.auto_update t-auto on` → รอบอัปเดตขึ้น 1.1.0 (`stable`) เอง และได้ Event `auto_update` done · ปิดตารางแล้วไม่มีรอบ · `sudo edgeconnector manager auto-update` / `plugin ls` คอลัมน์ AUTO |
 
 ข้อควรระวัง: version `1.2.x` ของ manager ที่เป็น script **อย่า promote เป็น `stable`** ไม่งั้นเครื่องที่ติดตั้งใหม่จะได้ตัวพัง · ลอง `--version` เท่านั้น
 manager ที่ build ด้วย `-X main.version=…` ต้องตรงกับ `MANAGER_VERSION` (make ทำให้เอง) ไม่งั้น `Already` ตัดสินผิด
@@ -250,5 +260,6 @@ ssh -L 8080:127.0.0.1:8080 <user>@<vps>      # แล้วเปิด http://l
 | M-3 | manager 1.2.0-bad-exit / 1.2.1-bad-hang | – | – | |
 | M-4 | manager 1.3.0 (stable) | ผ่านบางส่วน | 2026-11-25 | ลองใน sandbox (Docker, linux/arm64, ก่อน push จาก registry ในเครื่อง): image อ่าน stable ได้ 1.3.0 และตรวจลายเซ็นผ่าน · enroll · ติดตั้ง hello 1.0.0 จาก GitHub · `manager status` แสดง `center connected` · `plugin ls` healthy · ยังไม่ได้ลองบน VPS (systemd, install-manager.sh, self-update) |
 | D-1 | demo 1.0.0 (stable) ครบ 5 ชนิด | ผ่านใน sandbox | 2026-11-25 | Docker linux/arm64 · ติดตั้งจากสำเนาของ registry นี้ก่อน push (อ่าน `stable` ได้ 1.0.0) · `version`, `dnc.check` = `clean`, `job.run` → Event `job.done` · รอบก่อนปล่อย (build เดียวกัน) ลอง `greet`, job ซ้ำ = `already`, Notify, ถอด scope ครบแล้ว · ยังไม่ได้ลองบน VPS (amd64) |
+| M-6 | manager 1.4.0 auto update กับ `t-auto` | – | – | |
 | M-5 | manager 1.3.1 กับ `t-hang` | ผ่านใน sandbox | 2026-11-25 | Docker linux/arm64 ก่อน push: `t-hang` (`start_timeout_sec` 3) ล้มใน 5 วินาที (1.3.0 ค้าง `pending` เป็นชั่วโมง) · ไม่มี `sleep 3600` เหลือ · คำสั่งถัดไป (ติดตั้ง demo) ทำได้ทันที · **เจอ:** ติดตั้งครั้งแรกที่ start ไม่ขึ้นทิ้งโฟลเดอร์ `plugins/t-hang` ไว้ (โค้ดลบให้เฉพาะตอนโหลดไม่ผ่าน) → H-3 แบบ (ข) จะเห็นแบบเดียวกัน · ยังไม่ได้ลองบน VPS |
 | N-1 | branch negative | – | – | |

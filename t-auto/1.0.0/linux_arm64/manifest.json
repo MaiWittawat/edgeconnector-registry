@@ -1,0 +1,12 @@
+{
+  "name": "t-auto",
+  "version": "1.0.0",
+  "os": "linux",
+  "arch": "arm64",
+  "artifact": {
+    "sha256": "3255c4c1594907417f1c09ddf988f5e7ae9a0a593ba522d4c8531716da63653c",
+    "signature": "e1Y1sUsWqQRJbXE/yGnR8goQulegKDGyjN0nu5l6onGgWkpBpDJLbt5hyMD5x2aGr9kBQ9wjKWMIOrRWKNJwCg==",
+    "keyId": "lab-2026",
+    "size": "4797958"
+  }
+}
