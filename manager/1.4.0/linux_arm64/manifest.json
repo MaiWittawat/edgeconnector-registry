@@ -1,0 +1,12 @@
+{
+  "name": "manager",
+  "version": "1.4.0",
+  "os": "linux",
+  "arch": "arm64",
+  "artifact": {
+    "sha256": "79b9274e8d58e682c6fb718d801d6baee00812e9cb53c785584528fad1f07f3f",
+    "signature": "M7RCOfq/0kYAflKJq5THmbGkEN3s6rKiAY308ZjV0+0J5vZeDB3R2U970iae9a2UMYtLpk9/UnCHoh2/ff8FAA==",
+    "keyId": "lab-2026",
+    "size": "5171959"
+  }
+}
