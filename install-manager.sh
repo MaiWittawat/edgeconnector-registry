@@ -12,6 +12,7 @@
 #   --trusted-key ID=B64 key ที่เชื่อถือ ใส่ซ้ำได้ (ค่าเริ่มต้น = TRUSTED_KEYS ที่ฝังไว้)
 #   --ca-cert-file F     CA ส่วนตัวของ center → คัดลอกไป /etc/edgeconnector/ca.pem
 #   --reenroll           ล้างตัวตนเดิมแล้ว enroll ใหม่ด้วย --token (ย้ายเครื่อง / กู้เครื่อง)
+#   --set KEY=VALUE      เขียน/แทนบรรทัด KEY ใน manager.env ใส่ซ้ำได้ (key = CC_..., ค่าบรรทัดเดียวไม่มีช่องว่าง) · ใช้กับ flag ใหม่ที่เครื่องนี้ต้องการค่าไม่ใช่ค่าเริ่มต้น
 #   --uninstall          หยุดและลบทุกอย่างของ edgeconnector ออกจากเครื่อง (ใช้คนเดียว ไม่รับ option อื่น · ดู uninstall ข้างล่าง)
 #
 # ถอนแบบ offline (เครื่องออกเน็ตไม่ได้): ตอนติดตั้ง script เก็บสำเนาจาก registry ไว้ที่ /usr/local/lib/edgeconnector/install-manager.sh
@@ -235,6 +236,45 @@ set_env() {
 		END { if (!done) print k "=" ENVIRON["ENV_VALUE"] }
 	' "$TMP/manager.env" >"$TMP/manager.env.new"
 	mv -f "$TMP/manager.env.new" "$TMP/manager.env"
+}
+
+# --set KEY=VALUE: flag ใหม่ของ manager มีค่าเริ่มต้นที่ใช้ได้เสมอ แต่เครื่องหนึ่งอาจต้องใช้ค่าอื่น
+# center แก้ manager.env จากไกลไม่ได้ และ CLI (รันเป็น user edgeconnector) เขียนไฟล์ของ root ไม่ได้
+# ทางเดียวคือช่างรัน script นี้ซ้ำด้วย --set · ตรวจตอนอ่าน option ก่อนแตะ network หรือเครื่อง
+# check_set KV = ตรวจ --set หนึ่งตัว · ผิด = die
+check_set() {
+	case "$1" in *=*) ;; *) die "--set $1: want KEY=VALUE" ;; esac
+	set_key=${1%%=*}
+	# ไล่ตัวอักษรเอง ไม่ใช้ช่วง A-Z: บาง locale ให้ [A-Z] ตรงตัวเล็กด้วย
+	case "$set_key" in
+	CC_*) case "${set_key#CC_}" in '' | *[!ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_]*) set_key= ;; esac ;;
+	*) set_key= ;;
+	esac
+	[ -n "$set_key" ] || die "--set ${1%%=*}: the key must be CC_ followed by A-Z, 0-9 or _"
+	case "$set_key" in
+	CC_TOKEN) die "--set CC_TOKEN: the token is never written to disk, use --token" ;;
+	# key ที่มี option ของตัวเอง: ให้ option นั้นตรวจค่า (URL, key, ไฟล์ CA) ไม่งั้น --set เขียนค่าที่ไม่ผ่านการตรวจลงไปได้
+	CC_ADDR) die "--set CC_ADDR: use --server" ;;
+	CC_RELEASE_URL) die "--set CC_RELEASE_URL: use --base-url" ;;
+	CC_TRUSTED_KEYS) die "--set CC_TRUSTED_KEYS: use --trusted-key" ;;
+	CC_CA) die "--set CC_CA: use --ca-cert-file" ;;
+	CC_DATA | CC_SELF_DIR) die "--set $set_key: this path is managed by install-manager.sh" ;;
+	# โหมดใช้ครั้งเดียว ไม่ใช่ค่าตั้ง: อยู่ใน manager.env แล้ว service จะ enroll/จบทุกครั้งที่เปิด
+	CC_ENROLL_ONLY | CC_REENROLL | CC_VERSION) die "--set $set_key: not a setting" ;;
+	# manager ที่ปิด TLS กับ center ที่เปิด TLS ยัง active แต่ต่อไม่ได้ wait_active จึงไม่จับและไม่คืนค่าเดิม
+	CC_INSECURE) die "--set CC_INSECURE: tests only" ;;
+	esac
+	plain "${1#*=}" || die "--set $set_key: the value must be one line without spaces or quotes"
+}
+
+# apply_sets = เขียนทุก --set ลง $TMP/manager.env ตามลำดับที่ใส่ (key ซ้ำ = ตัวท้ายชนะ)
+# SETS คั่นด้วยช่องว่างได้เพราะค่าผ่าน plain แล้ว · set -f กัน glob ของ * ? [ ในค่า
+apply_sets() {
+	set -f
+	for kv in $SETS; do
+		set_env "${kv%%=*}" "${kv#*=}"
+	done
+	set +f
 }
 
 # install_file SRC DEST MODE = วางไฟล์ (ในโฟลเดอร์ของ root) เมื่อเนื้อหาต่างจากเดิม: เขียน DEST.tmp แล้ว rename · คืน 0 = เปลี่ยน
@@ -593,6 +633,7 @@ BASE_ARG=
 KEYS_ARG=
 CA_FILE=
 REENROLL=
+SETS=
 while [ $# -gt 0 ]; do
 	case "$1" in
 	--reenroll)
@@ -600,7 +641,7 @@ while [ $# -gt 0 ]; do
 		shift
 		continue
 		;;
-	--token | --server | --version | --channel | --base-url | --trusted-key | --ca-cert-file)
+	--token | --server | --version | --channel | --base-url | --trusted-key | --ca-cert-file | --set)
 		[ $# -ge 2 ] || die "$1 needs a value"
 		;;
 	--uninstall) die "--uninstall takes no other options" ;;
@@ -614,6 +655,10 @@ while [ $# -gt 0 ]; do
 	--base-url) BASE_ARG=$2 ;;
 	--trusted-key) KEYS_ARG="${KEYS_ARG:+$KEYS_ARG,}$2" ;;
 	--ca-cert-file) CA_FILE=$2 ;;
+	--set)
+		check_set "$2"
+		SETS="${SETS:+$SETS }$2"
+		;;
 	esac
 	shift 2
 done
@@ -744,6 +789,11 @@ else
 	warn "cannot download $BASE/install-manager.sh: offline --uninstall will not be available"
 fi
 if [ -n "$DRY_RUN" ]; then
+	set -f
+	for kv in $SETS; do
+		log "would set $kv in $ENV_FILE"
+	done
+	set +f
 	exit 0
 fi
 
@@ -806,6 +856,8 @@ else
 		[ -z "$CA_FILE" ] || echo "CC_CA=$CA_DEST"
 	} >"$TMP/manager.env"
 fi
+# ค่าเปลี่ยน = CHANGED=1 = restart · manager ใหม่ไม่ขึ้น = restore_config คืน manager.env เดิม
+apply_sets
 install_file "$TMP/manager.env" "$ENV_FILE" 0600 && CHANGED=1 && log "wrote $ENV_FILE"
 
 # enroll: ยังไม่ enroll หรือถูก revoke หรือสั่ง --reenroll
