@@ -1,0 +1,12 @@
+{
+  "name": "manager",
+  "version": "1.2.2-bad-exit",
+  "os": "linux",
+  "arch": "amd64",
+  "artifact": {
+    "sha256": "fdc6dd95e3c1f44297d8d3a4f85c5a92f49c56a9abc25faf9b18925003334833",
+    "signature": "UjtB2Mms8tKjCaTu5HuiIS8IhDhQXI53ZBuZ1nPbQdNspJVOKKXaFtNghq0kD/Wm1ClATX8SbynZzmHVwly+Ag==",
+    "keyId": "lab-2026",
+    "size": "148"
+  }
+}

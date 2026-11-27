@@ -55,6 +55,14 @@
         "1.2.1-bad-hang": [
           "linux_amd64"
         ],
+        "1.2.2-bad-exit": [
+          "linux_amd64",
+          "linux_arm64"
+        ],
+        "1.2.3-bad-hang": [
+          "linux_amd64",
+          "linux_arm64"
+        ],
         "1.3.0": [
           "linux_amd64",
           "linux_arm64"
