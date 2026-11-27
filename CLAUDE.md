@@ -36,7 +36,7 @@ Never merge `negative*` into `main`: one bad release in `main` makes `verify` fa
 - **A release is immutable.** `cc-release package` refuses to replace one, and a pushed release is in git history for good. A mistake means a new version. Before a push, you may delete the folder and rebuild.
 - **Ask before every `git push`.** The repo is public and releases cannot be taken back.
 - **Build from a clean commit**, never from a dirty tree: build from a checkout that equals `origin/main` of the repo that holds the code (clean `git status`, `HEAD` = `origin/main`), or a worktree of it, so the release can be rebuilt from its commit. The manager's `go.mod` pins edgeconnector to a commit, so it rebuilds the same.
-- **Never promote a bad release to a channel.** `install-manager.sh` installs `manager/channels/stable.json`, so `stable` must always point at a good manager. `stable` is manager 1.3.0 since 2026-11-25. `manager 1.2.x`, `hello 1.2.0` and every `t-*` fixture stay out of `stable` (except where `PLAN.md` says so).
+- **Never promote a bad release to a channel.** `install-manager.sh` installs `manager/channels/stable.json`, so `stable` must always point at a good manager. `stable` is manager 1.5.0 since 2026-11-27. `manager 1.2.x`, `hello 1.2.0` and every `t-*` fixture stay out of `stable` (except where `PLAN.md` says so).
 - **Keys** live in `~/cc-keys` (outside every repo). Never read, print, copy or commit a `.key` file; hand the path to `cc-release` or `make`.
   - `lab-2026` signs everything. Public: `lab-2026=gK3QtGj9wHs/Vm07udIW31CySE3MVP5e/3dUj0aIXV8=`
   - `lab-2027` signs only `hello 1.3.0` (key rotation and untrusted-key tests). Public: `lab-2027=dwI8XQefhpJVcwBxgENp//zZaqNuLSBz2hVpdbd6YxI=`
